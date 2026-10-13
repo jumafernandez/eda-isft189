@@ -1,0 +1,25 @@
+project:
+  type: website
+  output-dir: _site
+  render:
+    - index.qmd
+    - guia-dockerfile.qmd
+
+website:
+  title: "Práctica Profesional: Análisis y Exploración de Datos"
+  navbar:
+    left:
+      - href: index.qmd
+        text: Inicio
+      - href: guia-dockerfile.qmd
+        text: "Guía práctica: Dockerfile"
+  page-footer:
+    center: "LICDIA · Instituto Superior de Formación Técnica N°189"
+
+format:
+  html:
+    lang: es
+    toc: true
+    toc-title: "Contenido"
+    code-copy: true
+    css: estilo.css
