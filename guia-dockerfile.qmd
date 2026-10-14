@@ -48,7 +48,6 @@ proyecto/
 ├── api/
 │   ├── entrenar.py        # entrena el modelo y lo guarda
 │   ├── api.py             # expone el modelo como servicio
-│   ├── modelo.joblib      # modelo entrenado (lo genera entrenar.py)
 │   ├── requirements.txt   # librerías de la API, con versión
 │   ├── Dockerfile         # instrucciones para construir la imagen
 │   └── .dockerignore      # archivos que no se copian a la imagen
@@ -61,7 +60,7 @@ proyecto/
 
 # Entrenar y guardar el modelo
 
-El contenedor no entrena: recibe un modelo ya entrenado y lo usa para predecir. Por eso el primer paso es guardar el modelo en un archivo con `joblib`.
+La API no entrena: usa un modelo ya entrenado, guardado en un archivo con `joblib`. En este ejemplo, el entrenamiento se ejecuta una sola vez, **al construir la imagen** (se ve en la sección del Dockerfile). Así el modelo se genera con las mismas versiones de librerías que después lo van a usar, y el proyecto no depende de que cada persona tenga Python y scikit-learn instalados.
 
 Archivo `api/entrenar.py`:
 
@@ -84,7 +83,7 @@ print(f"Accuracy en prueba: {modelo.score(X_test, y_test):.3f}")
 joblib.dump(modelo, "modelo.joblib")
 ```
 
-Ejecútelo desde la carpeta `api` con `python entrenar.py`. Se crea el archivo `modelo.joblib`.
+Si quiere ver el resultado antes de usar Docker, puede ejecutarlo en su computadora con `python entrenar.py`, que imprime la accuracy y crea `modelo.joblib`.
 
 # La API
 
@@ -154,7 +153,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY api.py modelo.joblib ./
+COPY entrenar.py .
+RUN python entrenar.py
+
+COPY api.py .
 
 EXPOSE 8000
 
@@ -169,13 +171,15 @@ Cada instrucción cumple una función:
 | `WORKDIR /app` | Crea la carpeta `/app` dentro del contenedor y se ubica en ella. |
 | `COPY requirements.txt .` | Copia la lista de librerías desde su computadora a la imagen. |
 | `RUN pip install ...` | Instala las librerías mientras se construye la imagen. |
-| `COPY api.py modelo.joblib ./` | Copia el código de la API y el modelo entrenado. |
+| `COPY entrenar.py .` | Copia el script de entrenamiento. |
+| `RUN python entrenar.py` | Entrena el modelo durante la construcción y guarda `modelo.joblib` dentro de la imagen. |
+| `COPY api.py .` | Copia el código de la API. |
 | `EXPOSE 8000` | Documenta el puerto que usa la aplicación. |
 | `CMD [...]` | Indica el comando que se ejecuta al iniciar el contenedor: levantar la API con uvicorn. |
 
 : {tbl-colwidths="[38,62]"}
 
-Observe el orden: primero se copian e instalan las librerías y después el código. Docker guarda cada paso como una **capa** y, si un paso no cambió, reutiliza la capa anterior. Como el código cambia seguido y las librerías no, este orden evita reinstalar todo en cada construcción.
+Observe el orden: primero se copian e instalan las librerías y después el código. Docker guarda cada paso como una **capa** y, si un paso no cambió, reutiliza la capa anterior. Como el código cambia seguido y las librerías no, este orden evita reinstalar todo en cada construcción. Lo mismo pasa con el entrenamiento: si solo modifica `api.py`, el modelo no se vuelve a entrenar; si modifica `entrenar.py`, sí.
 
 El parámetro `--host 0.0.0.0` es necesario: indica que la API acepte conexiones desde fuera del contenedor. Con el valor por defecto (`127.0.0.1`), la API solo sería accesible desde adentro.
 
@@ -200,7 +204,7 @@ docker history api-modelo     # capas de la imagen y la instrucción que generó
 
 # El archivo .dockerignore
 
-Funciona como un `.gitignore`: indica qué archivos no deben copiarse a la imagen. Así la imagen queda más chica y no se incluyen datos que no corresponde distribuir.
+Funciona como un `.gitignore`: indica qué archivos no deben copiarse a la imagen. Así la imagen queda más chica y no se incluyen datos que no corresponde distribuir. Se excluye también `modelo.joblib`: si lo generó en su computadora para probar, no se mezcla con el que se entrena dentro de la imagen.
 
 Archivo `api/.dockerignore`:
 
@@ -209,6 +213,7 @@ __pycache__/
 *.ipynb
 .venv/
 datos/
+modelo.joblib
 ```
 
 # Construir y ejecutar
@@ -374,12 +379,12 @@ docker buildx build --platform linux/amd64,linux/arm64 -t su-usuario/api-modelo:
 
 ## ¿Qué se comparte: la imagen o el Dockerfile?
 
-El modelo no se genera dentro del contenedor: `entrenar.py` se ejecuta en su computadora y crea `modelo.joblib`. Al construir la imagen, la instrucción `COPY api.py modelo.joblib ./` toma ese archivo de su carpeta y lo guarda dentro de la imagen. Docker Compose tampoco guarda el modelo: solo construye las imágenes y levanta los contenedores.
+El modelo vive dentro de la imagen: la instrucción `RUN python entrenar.py` lo genera durante la construcción y queda guardado en una de sus capas. Docker Compose no guarda el modelo; solo construye las imágenes y levanta los contenedores. Según lo que comparta, la otra persona necesita cosas distintas:
 
-Esto define qué necesita otra persona según lo que usted le comparta:
+- **Si comparte la imagen** (por ejemplo, publicada en Docker Hub), el modelo ya viaja adentro. Solo necesita Docker y ejecutar `docker run`.
+- **Si comparte el Dockerfile o el repositorio**, su Docker construye la imagen y entrena el modelo en su máquina, a partir del código. Para eso, todo lo que usa el entrenamiento tiene que estar en el repositorio.
 
-- **Si comparte la imagen** (por ejemplo, publicada en Docker Hub), el modelo ya viaja adentro. La otra persona solo necesita Docker y ejecutar `docker run`.
-- **Si comparte el Dockerfile o el repositorio**, su Docker va a buscar `modelo.joblib` en la carpeta del proyecto en su máquina. Si el archivo no está, la construcción falla. En ese caso hay que incluir el modelo en el repositorio o pedirle que ejecute antes `entrenar.py`.
+En su proyecto, si los datos de entrenamiento están en un archivo, cópielo con `COPY` antes del `RUN python entrenar.py`. Si los datos son muy grandes o sensibles y no deben ir en la imagen, la alternativa es entrenar fuera de Docker, guardar `modelo.joblib` y copiar solo el modelo con `COPY modelo.joblib .` (quitándolo del `.dockerignore`).
 
 # Errores frecuentes
 
@@ -388,7 +393,7 @@ Esto define qué necesita otra persona según lo que usted le comparta:
 | `Cannot connect to the Docker daemon` | Docker Desktop no está abierto. Ábralo y espere a que indique que está en ejecución. |
 | `port is already allocated` | Otro contenedor o programa usa el puerto. Detenga el contenedor anterior o cambie el puerto de la izquierda, por ejemplo `-p 8080:8000`. |
 | La API no responde desde el navegador | Falta `--host 0.0.0.0` en el `CMD` o falta `-p` en `docker run`. |
-| `No such file or directory: 'modelo.joblib'` | No se ejecutó `entrenar.py` o el modelo no se copió en el Dockerfile. |
+| `No such file or directory: 'modelo.joblib'` | Falta `RUN python entrenar.py` en el Dockerfile o el entrenamiento falló: revise la salida de `docker build`. |
 | Advertencias de versión al cargar el modelo | La versión de scikit-learn de `requirements.txt` no coincide con la del entrenamiento. |
 | `denied: requested access to the resource is denied` al hacer `push` | No inició sesión con `docker login` o el nombre de la imagen no empieza con su usuario de Docker Hub. |
 | `exec format error` al ejecutar una imagen descargada | La imagen se construyó para otra arquitectura. Publíquela con `docker buildx` para `linux/amd64` y `linux/arm64`. |
@@ -400,7 +405,7 @@ Esto define qué necesita otra persona según lo que usted le comparta:
 
 1. Reproduzca el ejemplo completo y verifique que la interfaz devuelve una predicción.
 2. Adapte el ejemplo a su proyecto:
-    a. Guarde su modelo entrenado con `joblib`.
+    a. Adapte `entrenar.py` a su dataset y guarde el modelo con `joblib`.
     b. Modifique la clase de entrada de la API para que reciba los atributos de su dataset.
     c. Arme el `requirements.txt` con las versiones exactas de su entorno de entrenamiento.
 3. Construya la imagen de su API y pruébela con `curl` o desde `/docs`.

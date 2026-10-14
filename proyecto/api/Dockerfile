@@ -5,7 +5,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY api.py modelo.joblib ./
+COPY entrenar.py .
+RUN python entrenar.py
+
+COPY api.py .
 
 EXPOSE 8000
 
