@@ -15,7 +15,8 @@ format:
         #show raw.where(block: true): set text(size: 8.5pt)
         #show raw.where(block: true): block.with(fill: luma(244), inset: 8pt, radius: 3pt, width: 100%)
         #show heading: set text(size: 11pt, weight: "bold")
-        #show heading: it => block(above: 1.4em, below: 0.8em, upper(it.body) + ":")
+        #show heading.where(level: 1): it => block(above: 1.4em, below: 0.8em, upper(it.body) + ":")
+        #show heading.where(level: 2): it => block(above: 1.2em, below: 0.6em, it.body)
 ---
 
 ```{=typst}
@@ -177,6 +178,25 @@ Cada instrucción cumple una función:
 Observe el orden: primero se copian e instalan las librerías y después el código. Docker guarda cada paso como una **capa** y, si un paso no cambió, reutiliza la capa anterior. Como el código cambia seguido y las librerías no, este orden evita reinstalar todo en cada construcción.
 
 El parámetro `--host 0.0.0.0` es necesario: indica que la API acepte conexiones desde fuera del contenedor. Con el valor por defecto (`127.0.0.1`), la API solo sería accesible desde adentro.
+
+## ¿Qué es, concretamente, una imagen?
+
+Conviene distinguir tres cosas que suelen confundirse:
+
+| Elemento | Qué es |
+|:------|:----------|
+| `Dockerfile` | Un archivo de texto: la receta para construir la imagen. |
+| `docker-compose.yml` | Un archivo de texto: indica qué contenedores levantar y cómo se conectan. |
+| Imagen | El resultado de ejecutar la receta. No es un archivo de texto ni un ejecutable, sino una copia empaquetada de un sistema de archivos completo: un Linux mínimo, Python, las librerías, el código y el modelo entrenado. |
+
+: {tbl-colwidths="[30,70]"}
+
+Técnicamente, una imagen es un conjunto de **capas**, una por cada instrucción del Dockerfile que agrega archivos. Cada capa es un archivo comprimido con lo que ese paso agregó o modificó, y se acompaña de una pequeña configuración que indica, entre otras cosas, el comando que se ejecuta al iniciar. Por eso una imagen pesa cientos de megabytes, mientras que el Dockerfile ocupa unas pocas líneas. Puede verlo con estos comandos:
+
+```bash
+docker image ls               # imágenes disponibles y su tamaño
+docker history api-modelo     # capas de la imagen y la instrucción que generó cada una
+```
 
 # El archivo .dockerignore
 
@@ -351,6 +371,15 @@ Tenga en cuenta dos detalles:
 ```bash
 docker buildx build --platform linux/amd64,linux/arm64 -t su-usuario/api-modelo:1.0 --push .
 ```
+
+## ¿Qué se comparte: la imagen o el Dockerfile?
+
+El modelo no se genera dentro del contenedor: `entrenar.py` se ejecuta en su computadora y crea `modelo.joblib`. Al construir la imagen, la instrucción `COPY api.py modelo.joblib ./` toma ese archivo de su carpeta y lo guarda dentro de la imagen. Docker Compose tampoco guarda el modelo: solo construye las imágenes y levanta los contenedores.
+
+Esto define qué necesita otra persona según lo que usted le comparta:
+
+- **Si comparte la imagen** (por ejemplo, publicada en Docker Hub), el modelo ya viaja adentro. La otra persona solo necesita Docker y ejecutar `docker run`.
+- **Si comparte el Dockerfile o el repositorio**, su Docker va a buscar `modelo.joblib` en la carpeta del proyecto en su máquina. Si el archivo no está, la construcción falla. En ese caso hay que incluir el modelo en el repositorio o pedirle que ejecute antes `entrenar.py`.
 
 # Errores frecuentes
 
