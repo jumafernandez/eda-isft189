@@ -19,7 +19,7 @@ format:
 ---
 
 ```{=typst}
-#align(center)[#grid(columns: 3, column-gutter: 3.2cm, image("img/logo2.jpg", height: 1.7cm), image("img/logo3.jpg", height: 1.7cm), image("img/logo1.jpg", height: 1.7cm))]
+#align(center)[#image("img/logo3.jpg", height: 1.9cm)]
 #align(center)[#text(style: "italic", size: 10pt)[Laboratorio en Ciencia de Datos & Inteligencia Artificial \ Instituto Superior de Formación Técnica N°189]]
 #line(length: 100%, stroke: 0.5pt)
 #v(0.6em)
@@ -28,7 +28,7 @@ format:
 
 ::: {.content-visible when-format="html"}
 ```{=html}
-<div style="text-align:center"><img src="img/logo2.jpg" height="70"> &nbsp;&nbsp;&nbsp; <img src="img/logo3.jpg" height="70"> &nbsp;&nbsp;&nbsp; <img src="img/logo1.jpg" height="70"><p style="font-style:italic;margin:.6em 0 0">Laboratorio en Ciencia de Datos &amp; Inteligencia Artificial<br>Instituto Superior de Formación Técnica N°189</p><hr><h1 class="title" style="text-decoration:underline">GUÍA PRÁCTICA: DOCKERFILE</h1><p>Del modelo entrenado a la API en un contenedor</p></div>
+<div style="text-align:center"><img src="img/logo3.jpg" height="80"><p style="font-style:italic;margin:.6em 0 0">Laboratorio en Ciencia de Datos &amp; Inteligencia Artificial<br>Instituto Superior de Formación Técnica N°189</p><hr><h1 class="title" style="text-decoration:underline">GUÍA PRÁCTICA: DOCKERFILE</h1><p>Del modelo entrenado a la API en un contenedor</p></div>
 ```
 :::
 
@@ -312,6 +312,46 @@ Abra `http://localhost:8501` en el navegador, complete las medidas y presione **
 
 Para detener todo, presione `Ctrl+C` en la terminal o ejecute `docker compose down`.
 
+# Publicar la imagen en Docker Hub
+
+Hasta ahora la imagen existe solo en su computadora. Para usarla en otra máquina (un servidor del instituto, una máquina virtual en la nube o la computadora de un compañero) hay que publicarla en un **registro**. El registro público más usado es Docker Hub (<https://hub.docker.com>), donde también están las imágenes oficiales como `python:3.12-slim`.
+
+1. Cree una cuenta gratuita en Docker Hub. Su nombre de usuario va a formar parte del nombre de cada imagen.
+2. Inicie sesión desde la terminal. Docker le indica un código para confirmar en el navegador; también puede ingresar su usuario y un *token* de acceso creado en la configuración de su cuenta, en lugar de la contraseña.
+
+```bash
+docker login
+```
+
+3. Asigne a la imagen un nombre con el formato `usuario/repositorio:etiqueta`. La etiqueta identifica la versión; conviene usar números (`1.0`, `1.1`) en lugar de depender solo de `latest`.
+
+```bash
+docker tag api-modelo su-usuario/api-modelo:1.0
+```
+
+4. Suba la imagen. Si el repositorio no existe, Docker Hub lo crea como público.
+
+```bash
+docker push su-usuario/api-modelo:1.0
+```
+
+5. Desde cualquier otra máquina con Docker, la imagen se descarga y se ejecuta sin copiar código ni instalar librerías:
+
+```bash
+docker run -d -p 8000:8000 su-usuario/api-modelo:1.0
+```
+
+En Docker Compose, para usar la imagen publicada en lugar de construirla, se reemplaza `build: ./api` por `image: su-usuario/api-modelo:1.0`.
+
+Tenga en cuenta dos detalles:
+
+- **Una imagen pública la puede descargar cualquiera.** No incluya datos personales, contraseñas ni claves de acceso dentro de la imagen.
+- **La arquitectura importa.** Una imagen construida en una Mac con chip Apple (ARM) puede no correr en un servidor con procesador Intel o AMD. Para construir y publicar para ambas arquitecturas a la vez, use:
+
+```bash
+docker buildx build --platform linux/amd64,linux/arm64 -t su-usuario/api-modelo:1.0 --push .
+```
+
 # Errores frecuentes
 
 | Problema | Causa y solución |
@@ -321,6 +361,8 @@ Para detener todo, presione `Ctrl+C` en la terminal o ejecute `docker compose do
 | La API no responde desde el navegador | Falta `--host 0.0.0.0` en el `CMD` o falta `-p` en `docker run`. |
 | `No such file or directory: 'modelo.joblib'` | No se ejecutó `entrenar.py` o el modelo no se copió en el Dockerfile. |
 | Advertencias de versión al cargar el modelo | La versión de scikit-learn de `requirements.txt` no coincide con la del entrenamiento. |
+| `denied: requested access to the resource is denied` al hacer `push` | No inició sesión con `docker login` o el nombre de la imagen no empieza con su usuario de Docker Hub. |
+| `exec format error` al ejecutar una imagen descargada | La imagen se construyó para otra arquitectura. Publíquela con `docker buildx` para `linux/amd64` y `linux/arm64`. |
 | La interfaz muestra `Connection refused` | Usa `localhost` en lugar del nombre del servicio (`api`) dentro de Compose. |
 
 : {tbl-colwidths="[38,62]"}
@@ -334,6 +376,7 @@ Para detener todo, presione `Ctrl+C` en la terminal o ejecute `docker compose do
     c. Arme el `requirements.txt` con las versiones exactas de su entorno de entrenamiento.
 3. Construya la imagen de su API y pruébela con `curl` o desde `/docs`.
 4. Sume la interfaz con Docker Compose. Este es el punto de partida técnico de la entrega 04.
+5. Publique la imagen de su API en Docker Hub con una etiqueta de versión y verifique que un compañero puede ejecutarla con `docker run`.
 
 Podrá ayudarse con Modelos de Lenguaje, como Gemini y soluciones basadas en GPT, para adaptar el código a su proyecto.
 
@@ -341,5 +384,6 @@ Podrá ayudarse con Modelos de Lenguaje, como Gemini y soluciones basadas en GPT
 
 - Docker Inc. *Dockerfile reference*. <https://docs.docker.com/reference/dockerfile/>
 - Docker Inc. *Docker Compose*. <https://docs.docker.com/compose/>
+- Docker Inc. *Docker Hub: repositories*. <https://docs.docker.com/docker-hub/repos/>
 - FastAPI. *FastAPI in Containers - Docker*. <https://fastapi.tiangolo.com/deployment/docker/>
 - Streamlit. *Deploy Streamlit using Docker*. <https://docs.streamlit.io/deploy/tutorials/docker>
