@@ -108,8 +108,8 @@ from datetime import datetime
 
 import joblib
 import sklearn
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import accuracy_score
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import accuracy_score, f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -121,9 +121,16 @@ df = wine.data.features.copy()
 df["quality"] = wine.data.targets["quality"]
 
 # Variable objetivo categórica, igual que en la notebook
-df["calidad"] = df["quality"].apply(
-    lambda x: "baja" if x <= 4 else "media" if x <= 6 else "alta"
-)
+def categorizar(puntaje):
+    if puntaje <= 4:
+        return "baja"
+    elif puntaje <= 6:
+        return "media"
+    else:
+        return "alta"
+
+
+df["calidad"] = df["quality"].apply(categorizar)
 
 # Para que el ejemplo sea simple usamos solo cuatro variables
 VARIABLES = ["alcohol", "volatile_acidity", "sulphates", "citric_acid"]
@@ -135,14 +142,19 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 # 2. Pipeline: la transformación y el modelo viajan juntos
+#    (un árbol no necesita escalado; se incluye para mostrar cómo se guarda
+#    una transformación junto al modelo, como las de la notebook modelo)
 modelo = Pipeline([
     ("escalado", StandardScaler()),
-    ("clasificador", LogisticRegression(max_iter=1000, class_weight="balanced")),
+    ("clasificador", RandomForestClassifier(
+        n_estimators=200, class_weight="balanced", random_state=42)),
 ])
 modelo.fit(X_train, y_train)
 
-accuracy = accuracy_score(y_test, modelo.predict(X_test))
-print(f"Accuracy en prueba: {accuracy:.3f}")
+y_pred = modelo.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+f1_macro = f1_score(y_test, y_pred, average="macro")
+print(f"Accuracy en prueba: {accuracy:.3f} | F1 macro: {f1_macro:.3f}")
 
 # 3. Persistencia: el modelo en un archivo binario...
 joblib.dump(modelo, "modelo.joblib")
@@ -155,6 +167,7 @@ info = {
     "variables": VARIABLES,
     "clases": list(modelo.classes_),
     "accuracy_prueba": round(accuracy, 3),
+    "f1_macro_prueba": round(f1_macro, 3),
     "scikit_learn": sklearn.__version__,
 }
 with open("modelo_info.json", "w", encoding="utf-8") as f:
@@ -169,7 +182,7 @@ Ejecútelo una vez:
 python entrenar.py
 ```
 
-Se crean `modelo.joblib` y `modelo_info.json`. El objetivo del ejemplo no es lograr el mejor modelo sino mostrar el circuito completo: la accuracy es modesta porque se usan solo cuatro variables y las clases están desbalanceadas (`class_weight="balanced"` compensa en parte ese desbalance).
+Se crean `modelo.joblib` y `modelo_info.json`, y la terminal muestra las métricas en el conjunto de prueba (accuracy 0.816 y F1 macro 0.613). El objetivo del ejemplo no es lograr el mejor modelo sino mostrar el circuito completo. Como las clases están desbalanceadas (77 % de los vinos son de calidad media), se usa `class_weight="balanced"` y se informa también el F1 macro, que pesa por igual a las tres clases.
 
 ::: {.callout-warning}
 `joblib.load` y `pickle.load` pueden ejecutar código al cargar un archivo. Cargue solo modelos que haya generado usted o que provengan de una fuente confiable.
@@ -196,12 +209,179 @@ Content-Type: application/json
 {"alcohol": 12.5, "volatile_acidity": 0.35, "sulphates": 0.75, "citric_acid": 0.4}
 
 Respuesta 200 OK:
-{"calidad": "alta", "probabilidades": {"alta": 0.891, "baja": 0.025, "media": 0.084}}
+{"calidad": "alta", "probabilidades": {"alta": 0.885, "baja": 0.01, "media": 0.105}}
 ```
 
-# Implementar la API con FastAPI
+# FastAPI paso a paso
 
-**FastAPI** es un framework de Python para construir APIs web. Las rutas se definen con decoradores (`@app.get`, `@app.post`), los datos de entrada se describen con clases de **Pydantic** que validan tipos y rangos, y la documentación interactiva se genera automáticamente. Se ejecuta con **uvicorn**, un servidor web liviano.
+**FastAPI** es un framework de Python para construir APIs web. Antes de ver el archivo completo, conviene construir la API de a poco, probando cada paso. Así queda claro qué hace cada pieza.
+
+## Paso 1: las piezas
+
+Una API con FastAPI combina tres librerías, que se instalan con `requirements.txt`:
+
+| Pieza | Qué hace |
+|:--|:----------|
+| `fastapi` | Define la aplicación y sus rutas: qué función responde a cada método y URL. |
+| `pydantic` | Describe la forma de los datos de entrada y los valida. Se instala junto con FastAPI. |
+| `uvicorn` | Es el servidor web: escucha en un puerto, recibe los pedidos HTTP y se los pasa a la aplicación. |
+
+: {tbl-colwidths="[18,82]"}
+
+FastAPI no es un servidor por sí mismo; describe *qué responder*. Uvicorn es el programa que queda corriendo y *atiende* los pedidos.
+
+## Paso 2: la API mínima
+
+Cree un archivo `api.py` con este contenido:
+
+```python
+from fastapi import FastAPI
+
+app = FastAPI(title="API de calidad de vinos")
+
+
+@app.get("/")
+def estado():
+    return {"estado": "ok"}
+```
+
+Línea por línea:
+
+- `app = FastAPI(...)` crea la aplicación. La variable `app` es el objeto que después va a buscar uvicorn.
+- `@app.get("/")` es un **decorador**: le indica a FastAPI que cuando llegue un pedido `GET` a la ruta `/`, debe ejecutar la función que está justo debajo.
+- La función devuelve un diccionario de Python. FastAPI lo convierte automáticamente en JSON y lo envía como respuesta con el código 200.
+
+El nombre de la función (`estado`) no forma parte de la URL; solo se usa como título en la documentación.
+
+## Paso 3: levantar el servidor
+
+Desde la carpeta donde está `api.py`:
+
+```bash
+uvicorn api:app --reload
+```
+
+`api:app` significa "en el archivo `api.py`, usar la variable `app`". Si el archivo se llamara `main.py`, el comando sería `uvicorn main:app`. La terminal muestra `Uvicorn running on http://127.0.0.1:8000`; a partir de ahí la API está escuchando pedidos. Abra `http://localhost:8000` en el navegador y verá `{"estado":"ok"}`.
+
+La opción `--reload` reinicia el servidor cada vez que guarda un cambio en el código, algo útil mientras se desarrolla. Para detener el servidor, presione `Ctrl+C` en la terminal.
+
+## Paso 4: la documentación automática
+
+Sin escribir nada más, FastAPI ya ofrece dos direcciones:
+
+- `http://localhost:8000/docs`: una página interactiva (Swagger UI) con todas las rutas, donde se pueden probar completando formularios.
+- `http://localhost:8000/openapi.json`: la descripción formal de la API en el estándar **OpenAPI**. Es la que usa la página `/docs`, y otras herramientas pueden leerla para generar clientes automáticamente.
+
+Cada ruta que se agregue en los pasos siguientes aparece sola en `/docs`.
+
+## Paso 5: recibir datos con Pydantic
+
+Para predecir, la API tiene que recibir las variables de un vino. Esos datos llegan en el **cuerpo** del pedido, en formato JSON, y se describen con una clase que hereda de `BaseModel`:
+
+```python
+from pydantic import BaseModel
+
+
+class Vino(BaseModel):
+    alcohol: float
+    volatile_acidity: float
+    sulphates: float
+    citric_acid: float
+
+
+@app.post("/predecir")
+def predecir(vino: Vino):
+    return {"recibido": vino.model_dump()}
+```
+
+Cuando la función tiene un parámetro cuyo tipo es una clase de Pydantic, FastAPI entiende que debe leer el cuerpo del pedido y hace todo esto antes de ejecutar la función:
+
+1. Lee el JSON del cuerpo.
+2. Verifica que estén los cuatro campos y que cada uno sea un número.
+3. Si algo falla, responde **422** con el detalle del error y la función ni se ejecuta.
+4. Si todo está bien, crea un objeto `Vino` y se lo pasa a la función.
+
+Dentro de la función, cada valor se lee como un atributo (`vino.alcohol`) y `vino.model_dump()` lo convierte en un diccionario. Pruebe la ruta desde `/docs` con **Try it out**: la página ya muestra un JSON de ejemplo con los cuatro campos, porque lo toma de la clase `Vino`.
+
+## Paso 6: validar rangos
+
+Saber que un valor es un número no alcanza: una graduación alcohólica de 45 % o negativa no tiene sentido para el modelo. `Field` permite agregar restricciones:
+
+```python
+from pydantic import BaseModel, Field
+
+
+class Vino(BaseModel):
+    alcohol: float = Field(ge=0, le=20, description="Graduación alcohólica (%)")
+    volatile_acidity: float = Field(ge=0, le=2, description="Acidez volátil (g/L)")
+    sulphates: float = Field(ge=0, le=3, description="Sulfatos (g/L)")
+    citric_acid: float = Field(ge=0, le=2, description="Ácido cítrico (g/L)")
+```
+
+`ge` significa *mayor o igual* (*greater or equal*) y `le`, *menor o igual* (*less or equal*). La `description` aparece en `/docs`. Los rangos conviene definirlos a partir del análisis exploratorio: los mínimos y máximos observados, con algo de margen.
+
+## Paso 7: conectar el modelo
+
+Ahora la ruta deja de devolver lo recibido y usa el modelo. El modelo se carga **una sola vez**, al principio del archivo, fuera de las funciones:
+
+```python
+import joblib
+import pandas as pd
+
+modelo = joblib.load("modelo.joblib")
+
+
+@app.post("/predecir")
+def predecir(vino: Vino):
+    fila = pd.DataFrame([vino.model_dump()])
+    clase = modelo.predict(fila)[0]
+    return {"calidad": clase}
+```
+
+Como el código de arriba del archivo se ejecuta una vez, cuando uvicorn inicia la aplicación, el modelo queda en memoria y cada pedido lo reutiliza. Si `joblib.load` estuviera dentro de `predecir`, el archivo se leería en cada pedido. La fila se arma como un `DataFrame` de una sola fila porque el pipeline se entrenó con un `DataFrame` y espera las mismas columnas.
+
+## Paso 8: habilitar CORS
+
+Por último, para que una página web pueda consultar la API desde el navegador, se agrega el middleware de CORS (se explica en detalle en la sección del cliente HTML):
+
+```python
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(CORSMiddleware, allow_origins=["*"],
+                   allow_methods=["*"], allow_headers=["*"])
+```
+
+Un **middleware** es código que se ejecuta en todos los pedidos, antes y después de la función de la ruta. Este agrega a cada respuesta los encabezados que le indican al navegador que la página tiene permiso para leerla.
+
+## Qué pasa en cada pedido
+
+Con todas las piezas juntas, cuando la página envía un `POST /predecir`:
+
+1. Uvicorn recibe el pedido HTTP en el puerto 8000 y se lo entrega a la aplicación.
+2. El middleware de CORS lo deja pasar.
+3. FastAPI busca qué función corresponde a `POST /predecir`.
+4. Pydantic lee y valida el JSON. Si hay un error, responde 422 y el proceso termina acá.
+5. Se ejecuta `predecir`, que usa el modelo ya cargado en memoria.
+6. FastAPI convierte el diccionario devuelto en JSON y responde con código 200.
+7. El middleware agrega los encabezados de CORS y la respuesta vuelve al navegador.
+
+## Vocabulario
+
+| Término | Significado |
+|:--|:----------|
+| Ruta (*endpoint*) | Combinación de método HTTP y URL, por ejemplo `POST /predecir`. |
+| Decorador | La línea con `@` sobre una función. En FastAPI asocia la función a una ruta. |
+| Cuerpo (*body*) | Los datos que el cliente envía en un pedido `POST`, en este caso un JSON. |
+| Modelo de Pydantic | Clase que describe y valida los datos de entrada. No confundir con el modelo de aprendizaje automático. |
+| Uvicorn | Servidor que atiende los pedidos HTTP y los pasa a la aplicación de FastAPI. |
+| OpenAPI | Estándar para describir APIs. FastAPI lo genera solo y lo muestra en `/docs`. |
+| Middleware | Código que se ejecuta en todos los pedidos, como el de CORS. |
+
+: {tbl-colwidths="[28,72]"}
+
+## El archivo completo
+
+Juntando los pasos, y sumando la ruta `/modelo` y las probabilidades de cada clase, queda el archivo `api.py` del ejemplo:
 
 Archivo `api.py`:
 
@@ -257,20 +437,10 @@ def predecir(vino: Vino):
     }
 ```
 
-Algunos detalles del código:
+Respecto de los pasos anteriores, el archivo completo agrega dos detalles:
 
-- El modelo se carga **fuera** de las funciones, al iniciar la API. Si se cargara dentro de `predecir`, se leería el archivo en cada pedido.
-- La clase `Vino` es el contrato de entrada. `Field(ge=..., le=...)` define el rango válido de cada variable (*greater or equal*, *less or equal*).
-- La fila se arma con las columnas en el orden que indica `modelo_info.json`, que es el mismo orden usado al entrenar.
-- Lo que devuelve cada función (un diccionario) FastAPI lo convierte en JSON.
-
-Levante la API:
-
-```bash
-uvicorn api:app --reload
-```
-
-La opción `--reload` reinicia la API cada vez que se guarda un cambio en el código; úsela solo mientras desarrolla. La API queda escuchando en `http://localhost:8000`.
+- La fila se arma con las columnas en el orden que indica `modelo_info.json`, que es el mismo orden usado al entrenar. Así el resultado no depende del orden en que estén escritos los campos de la clase `Vino`.
+- Además de la clase, devuelve la probabilidad de cada una con `predict_proba`, útil para saber qué tan seguro está el modelo.
 
 # Probar la API
 
