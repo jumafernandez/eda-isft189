@@ -47,3 +47,10 @@ def predecir(vino: Vino):
         "probabilidades": {c: round(float(p), 3)
                            for c, p in zip(modelo.classes_, probabilidades)},
     }
+
+
+# Permite levantar la API con: python api.py
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(app, host="127.0.0.1", port=8000)
