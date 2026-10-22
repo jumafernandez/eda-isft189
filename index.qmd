@@ -12,5 +12,7 @@ Material de la cursada.
 
 ## Guías
 
+- [Guía práctica: modelos como servicio con FastAPI](guia-fastapi.qmd). Persistir un modelo, servirlo con una API y consumirlo desde una página HTML. También disponible en [PDF](guia-fastapi.pdf).
+- [Código de ejemplo: modelo-api](https://github.com/jumafernandez/eda-isft189/tree/main/modelo-api): entrenamiento, API con FastAPI y cliente HTML.
 - [Guía práctica: Dockerfile](guia-dockerfile.qmd). Del modelo entrenado a la API en un contenedor. También disponible en [PDF](guia-dockerfile.pdf).
 - [Código de ejemplo](https://github.com/jumafernandez/eda-isft189/tree/main/proyecto): API con FastAPI, interfaz con Streamlit y Docker Compose.

@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Calidad de vinos</title>
+  <style>
+    body { font-family: sans-serif; max-width: 420px; margin: 40px auto; }
+    label { display: block; margin-top: 12px; }
+    input { width: 100%; padding: 6px; }
+    button { margin-top: 16px; padding: 8px 16px; }
+    #resultado { margin-top: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Calidad de vinos</h1>
+
+  <form id="formulario">
+    <label>Alcohol (%)
+      <input type="number" step="0.1" id="alcohol" value="12.5">
+    </label>
+    <label>Acidez volátil (g/L)
+      <input type="number" step="0.01" id="volatile_acidity" value="0.35">
+    </label>
+    <label>Sulfatos (g/L)
+      <input type="number" step="0.01" id="sulphates" value="0.75">
+    </label>
+    <label>Ácido cítrico (g/L)
+      <input type="number" step="0.01" id="citric_acid" value="0.40">
+    </label>
+    <button type="submit">Predecir</button>
+  </form>
+
+  <p id="resultado"></p>
+
+  <script>
+    const API_URL = "http://localhost:8000";
+
+    document.getElementById("formulario").addEventListener("submit", async (evento) => {
+      evento.preventDefault();  // evita que la página se recargue
+
+      // 1. Armar el JSON con los valores del formulario
+      const datos = {
+        alcohol: Number(document.getElementById("alcohol").value),
+        volatile_acidity: Number(document.getElementById("volatile_acidity").value),
+        sulphates: Number(document.getElementById("sulphates").value),
+        citric_acid: Number(document.getElementById("citric_acid").value),
+      };
+
+      // 2. Enviarlo a la API con un POST
+      const respuesta = await fetch(`${API_URL}/predecir`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(datos),
+      });
+
+      // 3. Mostrar la respuesta
+      const resultado = await respuesta.json();
+      if (respuesta.ok) {
+        document.getElementById("resultado").textContent =
+          `Calidad predicha: ${resultado.calidad}`;
+      } else {
+        document.getElementById("resultado").textContent =
+          "Error: revise los valores ingresados";
+      }
+    });
+  </script>
+</body>
+</html>

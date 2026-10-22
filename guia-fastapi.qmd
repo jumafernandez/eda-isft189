@@ -1,0 +1,443 @@
+---
+pagetitle: "Guía práctica: modelos como servicio con FastAPI"
+lang: es
+format:
+  html: default
+  typst:
+    mainfont: "TeX Gyre Schola"
+    fontsize: 11pt
+    margin:
+      x: 2.5cm
+      y: 2.2cm
+    include-in-header:
+      text: |
+        #set par(justify: true, leading: 0.95em, spacing: 1.2em)
+        #show raw.where(block: true): set text(size: 8.5pt)
+        #show raw.where(block: true): block.with(fill: luma(244), inset: 8pt, radius: 3pt, width: 100%)
+        #show heading: set text(size: 11pt, weight: "bold")
+        #show heading.where(level: 1): it => block(above: 1.4em, below: 0.8em, upper(it.body) + ":")
+        #show heading.where(level: 2): it => block(above: 1.2em, below: 0.6em, it.body)
+---
+
+```{=typst}
+#align(center)[#image("img/logo3.jpg", height: 1.9cm)]
+#align(center)[#text(style: "italic", size: 10pt)[Laboratorio en Ciencia de Datos & Inteligencia Artificial \ Instituto Superior de Formación Técnica N°189]]
+#line(length: 100%, stroke: 0.5pt)
+#v(0.6em)
+#align(center)[#text(weight: "bold", size: 12pt)[#underline[GUÍA PRÁCTICA: MODELOS COMO SERVICIO CON FASTAPI]] #linebreak() #v(0.3em) #text(size: 10.5pt)[Persistir un modelo, servirlo con una API y consumirlo desde una página web]]
+```
+
+::: {.content-visible when-format="html"}
+```{=html}
+<div style="text-align:center"><img src="img/logo3.jpg" height="80"><p style="font-style:italic;margin:.6em 0 0">Laboratorio en Ciencia de Datos &amp; Inteligencia Artificial<br>Instituto Superior de Formación Técnica N°189</p><hr><h1 class="title" style="text-decoration:underline">GUÍA PRÁCTICA: MODELOS COMO SERVICIO CON FASTAPI</h1><p>Persistir un modelo, servirlo con una API y consumirlo desde una página web</p></div>
+```
+:::
+
+# Introducción
+
+En la clase de APIs trabajamos como **consumidores**: desde una notebook enviamos pedidos a servicios de terceros (GitHub, YouTube, Reddit) y recibimos datos en formato JSON. En esta guía cambiamos de rol y pasamos a ser **proveedores**: tomamos un modelo de aprendizaje automático entrenado, lo guardamos en un archivo y lo publicamos a través de una API propia, de modo que cualquier aplicación pueda pedirle predicciones sin conocer cómo fue construido.
+
+La solución tiene tres piezas, cada una en su propio archivo:
+
+| Pieza | Archivo | Responsabilidad |
+|:--|:--|:----------|
+| Entrenamiento | `entrenar.py` | Carga los datos, entrena el modelo y lo guarda en disco junto con sus metadatos. Se ejecuta una sola vez. |
+| Servicio | `api.py` | Carga el modelo guardado y expone rutas HTTP que reciben datos y devuelven predicciones. Queda siempre activo. |
+| Cliente | `index.html` | Página web con un formulario que envía los datos a la API y muestra la respuesta. |
+
+: {tbl-colwidths="[18,18,64]"}
+
+El ejemplo usa el dataset **Wine Quality** del repositorio UCI, el mismo de la notebook modelo del segundo entregable, y la misma etiqueta de calidad (baja, media o alta). Al terminar, reemplace el dataset y las variables por los de su proyecto. El código completo está en la carpeta [`modelo-api`](https://github.com/jumafernandez/eda-isft189/tree/main/modelo-api) del repositorio del curso.
+
+# Estructura y entorno
+
+Cree una carpeta con la siguiente estructura:
+
+```text
+modelo-api/
+├── entrenar.py          # entrena el modelo y lo guarda
+├── api.py               # sirve el modelo a través de HTTP
+├── index.html           # cliente web que consume la API
+└── requirements.txt     # librerías con su versión
+```
+
+Es recomendable trabajar en un entorno virtual, para que las librerías del proyecto no se mezclen con las del sistema. Desde la carpeta `modelo-api`:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate        # en Windows: .venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Archivo `requirements.txt`:
+
+```text
+fastapi==0.143.0
+uvicorn==0.53.0
+pandas==3.0.5
+scikit-learn==1.9.1
+joblib==1.6.0
+ucimlrepo==0.0.7
+```
+
+Las versiones se fijan porque un modelo guardado con una versión de scikit-learn puede no cargarse, o comportarse distinto, con otra.
+
+# Persistir el modelo
+
+**Persistir** (o serializar) un modelo es guardar en un archivo el objeto que está en la memoria de Python, para volver a cargarlo más tarde sin reentrenar. Las opciones más comunes son:
+
+| Formato | Características |
+|:--|:----------|
+| `pickle` | Módulo estándar de Python; guarda cualquier objeto. |
+| `joblib` | Más eficiente con arreglos de NumPy. Es la opción que recomienda scikit-learn. |
+| ONNX | Formato abierto que permite usar el modelo desde otros lenguajes y plataformas. |
+
+: {tbl-colwidths="[20,80]"}
+
+Dos decisiones importantes:
+
+- **Guardar el pipeline completo, no solo el clasificador.** Si el modelo se entrenó con datos escalados, la API tiene que aplicar exactamente el mismo escalado a cada dato nuevo. Un `Pipeline` de scikit-learn une la transformación y el modelo en un solo objeto, de modo que al guardarlo se guardan ambos.
+- **Guardar metadatos en un archivo legible.** El `.joblib` es binario. Un JSON al lado documenta qué variables espera el modelo, en qué orden, qué clases puede devolver, cuándo se entrenó y con qué versión de scikit-learn.
+
+Archivo `entrenar.py`:
+
+```python
+# Entrena el modelo de calidad de vinos y lo guarda en disco
+import json
+from datetime import datetime
+
+import joblib
+import sklearn
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import StandardScaler
+from ucimlrepo import fetch_ucirepo
+
+# 1. Datos: Wine Quality (UCI), el mismo dataset de la notebook modelo
+wine = fetch_ucirepo(id=186)
+df = wine.data.features.copy()
+df["quality"] = wine.data.targets["quality"]
+
+# Variable objetivo categórica, igual que en la notebook
+df["calidad"] = df["quality"].apply(
+    lambda x: "baja" if x <= 4 else "media" if x <= 6 else "alta"
+)
+
+# Para que el ejemplo sea simple usamos solo cuatro variables
+VARIABLES = ["alcohol", "volatile_acidity", "sulphates", "citric_acid"]
+X = df[VARIABLES]
+y = df["calidad"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, random_state=42, stratify=y
+)
+
+# 2. Pipeline: la transformación y el modelo viajan juntos
+modelo = Pipeline([
+    ("escalado", StandardScaler()),
+    ("clasificador", LogisticRegression(max_iter=1000, class_weight="balanced")),
+])
+modelo.fit(X_train, y_train)
+
+accuracy = accuracy_score(y_test, modelo.predict(X_test))
+print(f"Accuracy en prueba: {accuracy:.3f}")
+
+# 3. Persistencia: el modelo en un archivo binario...
+joblib.dump(modelo, "modelo.joblib")
+
+# ...y sus metadatos en un JSON legible
+info = {
+    "nombre": "Clasificador de calidad de vinos",
+    "version": "1.0",
+    "fecha_entrenamiento": datetime.now().isoformat(timespec="seconds"),
+    "variables": VARIABLES,
+    "clases": list(modelo.classes_),
+    "accuracy_prueba": round(accuracy, 3),
+    "scikit_learn": sklearn.__version__,
+}
+with open("modelo_info.json", "w", encoding="utf-8") as f:
+    json.dump(info, f, ensure_ascii=False, indent=2)
+
+print("Modelo guardado en modelo.joblib y metadatos en modelo_info.json")
+```
+
+Ejecútelo una vez:
+
+```bash
+python entrenar.py
+```
+
+Se crean `modelo.joblib` y `modelo_info.json`. El objetivo del ejemplo no es lograr el mejor modelo sino mostrar el circuito completo: la accuracy es modesta porque se usan solo cuatro variables y las clases están desbalanceadas (`class_weight="balanced"` compensa en parte ese desbalance).
+
+::: {.callout-warning}
+`joblib.load` y `pickle.load` pueden ejecutar código al cargar un archivo. Cargue solo modelos que haya generado usted o que provengan de una fuente confiable.
+:::
+
+# Diseñar la API
+
+Antes de escribir código, el arquitecto define el **contrato** de la API: qué rutas existen, qué recibe cada una y qué devuelve. El cliente solo necesita conocer este contrato; no necesita saber qué algoritmo hay detrás.
+
+| Método y ruta | Recibe | Devuelve |
+|:--|:--|:----------|
+| `GET /` | Nada | `{"estado": "ok"}`, para comprobar que el servicio está activo. |
+| `GET /modelo` | Nada | Los metadatos del modelo (el contenido de `modelo_info.json`). |
+| `POST /predecir` | JSON con las cuatro variables de un vino | La calidad predicha y la probabilidad de cada clase. |
+
+: {tbl-colwidths="[24,26,50]"}
+
+Se usa `POST` en `/predecir` porque el cliente envía datos en el cuerpo del pedido para que el servidor los procese. Un ejemplo de pedido y respuesta:
+
+```text
+POST /predecir
+Content-Type: application/json
+
+{"alcohol": 12.5, "volatile_acidity": 0.35, "sulphates": 0.75, "citric_acid": 0.4}
+
+Respuesta 200 OK:
+{"calidad": "alta", "probabilidades": {"alta": 0.891, "baja": 0.025, "media": 0.084}}
+```
+
+# Implementar la API con FastAPI
+
+**FastAPI** es un framework de Python para construir APIs web. Las rutas se definen con decoradores (`@app.get`, `@app.post`), los datos de entrada se describen con clases de **Pydantic** que validan tipos y rangos, y la documentación interactiva se genera automáticamente. Se ejecuta con **uvicorn**, un servidor web liviano.
+
+Archivo `api.py`:
+
+```python
+# API que sirve el modelo entrenado
+import json
+
+import joblib
+import pandas as pd
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, Field
+
+# El modelo se carga una sola vez, al iniciar la API
+modelo = joblib.load("modelo.joblib")
+with open("modelo_info.json", encoding="utf-8") as f:
+    info = json.load(f)
+
+app = FastAPI(title="API de calidad de vinos")
+
+# Permite que una página web abierta en el navegador consulte la API
+app.add_middleware(CORSMiddleware, allow_origins=["*"],
+                   allow_methods=["*"], allow_headers=["*"])
+
+
+# Datos que espera la API: nombre, tipo y rango de cada variable
+class Vino(BaseModel):
+    alcohol: float = Field(ge=0, le=20, description="Graduación alcohólica (%)")
+    volatile_acidity: float = Field(ge=0, le=2, description="Acidez volátil (g/L)")
+    sulphates: float = Field(ge=0, le=3, description="Sulfatos (g/L)")
+    citric_acid: float = Field(ge=0, le=2, description="Ácido cítrico (g/L)")
+
+
+@app.get("/")
+def estado():
+    return {"estado": "ok"}
+
+
+@app.get("/modelo")
+def datos_del_modelo():
+    return info
+
+
+@app.post("/predecir")
+def predecir(vino: Vino):
+    fila = pd.DataFrame([vino.model_dump()])[info["variables"]]
+    clase = modelo.predict(fila)[0]
+    probabilidades = modelo.predict_proba(fila)[0]
+    return {
+        "calidad": clase,
+        "probabilidades": {c: round(float(p), 3)
+                           for c, p in zip(modelo.classes_, probabilidades)},
+    }
+```
+
+Algunos detalles del código:
+
+- El modelo se carga **fuera** de las funciones, al iniciar la API. Si se cargara dentro de `predecir`, se leería el archivo en cada pedido.
+- La clase `Vino` es el contrato de entrada. `Field(ge=..., le=...)` define el rango válido de cada variable (*greater or equal*, *less or equal*).
+- La fila se arma con las columnas en el orden que indica `modelo_info.json`, que es el mismo orden usado al entrenar.
+- Lo que devuelve cada función (un diccionario) FastAPI lo convierte en JSON.
+
+Levante la API:
+
+```bash
+uvicorn api:app --reload
+```
+
+La opción `--reload` reinicia la API cada vez que se guarda un cambio en el código; úsela solo mientras desarrolla. La API queda escuchando en `http://localhost:8000`.
+
+# Probar la API
+
+Con la API corriendo, abra `http://localhost:8000/docs` en el navegador. FastAPI genera una página con todas las rutas. En `POST /predecir`, presione **Try it out**, complete el JSON de entrada y presione **Execute**: debajo aparece la respuesta con su código HTTP.
+
+![Documentación automática de FastAPI en /docs.](img/fastapi-docs.png){width=85% fig-align="center"}
+
+También puede probarla desde la terminal (en Windows, use `curl.exe` si trabaja en PowerShell):
+
+```bash
+curl -X POST http://localhost:8000/predecir -H "Content-Type: application/json" -d "{\"alcohol\": 12.5, \"volatile_acidity\": 0.35, \"sulphates\": 0.75, \"citric_acid\": 0.4}"
+```
+
+O desde Python, como hicimos en la clase de APIs, ahora contra nuestro propio servicio:
+
+```python
+import requests
+
+vino = {"alcohol": 9.4, "volatile_acidity": 0.9, "sulphates": 0.5, "citric_acid": 0.0}
+respuesta = requests.post("http://localhost:8000/predecir", json=vino)
+print(respuesta.status_code, respuesta.json())
+```
+
+## Validación de los datos
+
+Si el pedido trae un valor fuera de rango, un campo faltante o un texto donde va un número, FastAPI lo rechaza con el código **422** y explica el problema. Por ejemplo, con `"alcohol": 45`:
+
+```text
+422 Unprocessable Entity
+{"detail": [{"type": "less_than_equal", "loc": ["body", "alcohol"],
+             "msg": "Input should be less than or equal to 20", "input": 45}]}
+```
+
+Así el modelo nunca recibe datos inválidos. Los códigos HTTP también forman parte del contrato: **200** (todo bien), **422** (datos inválidos), **404** (ruta inexistente) y **500** (error del servidor).
+
+# Consumir la API desde una página HTML
+
+El cliente más simple es una página web con un formulario. Al presionar el botón, JavaScript arma un JSON con los valores, lo envía a la API con `fetch` y muestra la respuesta. No necesita ningún servidor: el archivo se abre directamente en el navegador.
+
+Archivo `index.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Calidad de vinos</title>
+  <style>
+    body { font-family: sans-serif; max-width: 420px; margin: 40px auto; }
+    label { display: block; margin-top: 12px; }
+    input { width: 100%; padding: 6px; }
+    button { margin-top: 16px; padding: 8px 16px; }
+    #resultado { margin-top: 20px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Calidad de vinos</h1>
+
+  <form id="formulario">
+    <label>Alcohol (%)
+      <input type="number" step="0.1" id="alcohol" value="12.5">
+    </label>
+    <label>Acidez volátil (g/L)
+      <input type="number" step="0.01" id="volatile_acidity" value="0.35">
+    </label>
+    <label>Sulfatos (g/L)
+      <input type="number" step="0.01" id="sulphates" value="0.75">
+    </label>
+    <label>Ácido cítrico (g/L)
+      <input type="number" step="0.01" id="citric_acid" value="0.40">
+    </label>
+    <button type="submit">Predecir</button>
+  </form>
+
+  <p id="resultado"></p>
+
+  <script>
+    const API_URL = "http://localhost:8000";
+
+    document.getElementById("formulario").addEventListener("submit", async (evento) => {
+      evento.preventDefault();  // evita que la página se recargue
+
+      // 1. Armar el JSON con los valores del formulario
+      const datos = {
+        alcohol: Number(document.getElementById("alcohol").value),
+        volatile_acidity: Number(document.getElementById("volatile_acidity").value),
+        sulphates: Number(document.getElementById("sulphates").value),
+        citric_acid: Number(document.getElementById("citric_acid").value),
+      };
+
+      // 2. Enviarlo a la API con un POST
+      const respuesta = await fetch(`${API_URL}/predecir`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(datos),
+      });
+
+      // 3. Mostrar la respuesta
+      const resultado = await respuesta.json();
+      if (respuesta.ok) {
+        document.getElementById("resultado").textContent =
+          `Calidad predicha: ${resultado.calidad}`;
+      } else {
+        document.getElementById("resultado").textContent =
+          "Error: revise los valores ingresados";
+      }
+    });
+  </script>
+</body>
+</html>
+```
+
+Con la API corriendo, haga doble clic en `index.html`, complete los valores y presione **Predecir**.
+
+![Página HTML consumiendo la API del modelo.](img/fastapi-html.png){width=45% fig-align="center"}
+
+## ¿Por qué hace falta CORS?
+
+Por seguridad, el navegador bloquea los pedidos que una página hace a un servidor de **otro origen** (otro dominio, protocolo o puerto), salvo que ese servidor lo autorice explícitamente. Nuestra página (un archivo local) y la API (`localhost:8000`) son orígenes distintos; por eso `api.py` incluye el `CORSMiddleware`. Si lo quita, la API sigue funcionando en `/docs`, con `curl` o con Python, pero el `fetch` de la página falla y la consola del navegador (F12) muestra un error de CORS.
+
+`allow_origins=["*"]` autoriza a cualquier origen, lo que es cómodo para aprender. En un servicio real se reemplaza por la lista de dominios que pueden consultar la API, por ejemplo `allow_origins=["https://mi-sitio.com"]`.
+
+# Decisiones de arquitectura
+
+Además del código, el ejemplo refleja decisiones que conviene sostener en cualquier servicio de modelos:
+
+- **Separar entrenamiento y servicio.** Se entrena una vez; la API solo carga y predice.
+- **Cargar el modelo una sola vez**, al iniciar el servicio.
+- **Definir y validar el contrato** de entrada y salida.
+- **Versionar** el modelo, el código y las librerías, y registrarlo en los metadatos.
+- Ofrecer una **ruta de estado** para saber si el servicio está activo.
+- **Restringir CORS** y no incluir claves ni datos sensibles en el código.
+- **Responder errores con códigos HTTP claros** en lugar de dejar que el servicio se caiga.
+
+El paso siguiente es empaquetar la API en un contenedor para que funcione igual en cualquier máquina; eso se trabaja en la [Guía práctica: Dockerfile](guia-dockerfile.qmd).
+
+# Errores frecuentes
+
+| Problema | Causa y solución |
+|:--|:--------|
+| `No such file or directory: 'modelo.joblib'` | No se ejecutó `python entrenar.py`, o se levantó la API desde otra carpeta. Ejecute `uvicorn` desde la carpeta donde están los archivos. |
+| `Address already in use` | Otro proceso usa el puerto 8000. Cierre la otra API o use `uvicorn api:app --port 8001` (y actualice `API_URL` en el HTML). |
+| Advertencias `InconsistentVersionWarning` al cargar el modelo | El modelo se guardó con otra versión de scikit-learn. Reentrene con las versiones de `requirements.txt`. |
+| La página no muestra nada y la consola indica un error de CORS | Falta el `CORSMiddleware` en `api.py`. |
+| La página muestra `Failed to fetch` | La API no está corriendo o `API_URL` apunta a otra dirección o puerto. |
+| Respuesta `422` | Algún valor está fuera de rango, falta un campo o el nombre no coincide con la clase de entrada. Revise el detalle del error. |
+| `KeyError` con el nombre de una columna | Las variables de la clase de entrada no coinciden con las usadas al entrenar. |
+
+: {tbl-colwidths="[38,62]"}
+
+# Consignas
+
+1. Reproduzca el ejemplo completo: entrene el modelo, levante la API, pruébela en `/docs` y verifique que `index.html` muestra la predicción.
+2. Agregue a la página el detalle de las probabilidades de cada clase que ya devuelve la API.
+3. Adapte el ejemplo a su proyecto:
+    a. Modifique `entrenar.py` para usar su dataset y guardar su pipeline con `joblib`, junto con su archivo de metadatos.
+    b. Redefina la clase de entrada de la API con las variables de su proyecto y rangos válidos razonables.
+    c. Adapte el formulario HTML a esas variables.
+4. Documente en el repositorio de su proyecto el contrato de su API (rutas, entrada y salida) e incluya el `requirements.txt` con versiones exactas.
+
+Podrá ayudarse con Modelos de Lenguaje, como Gemini y soluciones basadas en GPT, para adaptar el código a su proyecto.
+
+# Referencias
+
+- Cortez, P., Cerdeira, A., Almeida, F., Matos, T. y Reis, J. (2009). *Wine Quality* \[Dataset\]. UCI Machine Learning Repository. <https://doi.org/10.24432/C56S3T>
+- FastAPI. *FastAPI documentation*. <https://fastapi.tiangolo.com/>
+- FastAPI. *CORS (Cross-Origin Resource Sharing)*. <https://fastapi.tiangolo.com/tutorial/cors/>
+- MDN Web Docs. *Using the Fetch API*. <https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API/Using_Fetch>
+- Pydantic. *Pydantic documentation*. <https://docs.pydantic.dev/>
+- scikit-learn. *Model persistence*. <https://scikit-learn.org/stable/model_persistence.html>

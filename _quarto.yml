@@ -4,6 +4,7 @@ project:
   render:
     - index.qmd
     - guia-dockerfile.qmd
+    - guia-fastapi.qmd
 
 website:
   title: "Práctica Profesional: Análisis y Exploración de Datos"
@@ -11,6 +12,8 @@ website:
     left:
       - href: index.qmd
         text: Inicio
+      - href: guia-fastapi.qmd
+        text: "Guía práctica: FastAPI"
       - href: guia-dockerfile.qmd
         text: "Guía práctica: Dockerfile"
   page-footer:
