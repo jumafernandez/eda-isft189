@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block titulo %}Conversar{% endblock %}
+
+{% block contenido %}
+<p class="volanta">Asistente</p>
+<h1>Pregúntele al modelo</h1>
+<p class="bajada">Escriba su consulta con sus palabras. Un modelo de lenguaje la
+  interpreta, le pide las estimaciones al modelo de calidad de vinos y le
+  responde. Debajo de cada respuesta se ve qué consultó.</p>
+
+{% if not hay_clave %}
+<article class="resultado vacio">
+  <p><strong>Este escenario no está activo.</strong> Necesita la clave de un
+    modelo de lenguaje en la variable de entorno <code>ANTHROPIC_API_KEY</code>.
+    El resto de la aplicación funciona sin ella.</p>
+</article>
+{% else %}
+<div id="mensajes" class="mensajes" aria-live="polite"></div>
+
+<!-- La respuesta de /conversar es un trozo de HTML con el intercambio nuevo,
+     que se agrega al final de #mensajes (hx-swap="beforeend").
+     hx-on::after-request vacía la casilla cuando llega la respuesta. -->
+<form class="conversar" hx-post="{{ url_for('enviar_mensaje') }}"
+      hx-target="#mensajes" hx-swap="beforeend" hx-indicator="#enviar"
+      hx-on::after-request="this.mensaje.value = ''; this.mensaje.focus()">
+  <!-- La conversación previa viaja con cada mensaje: el servidor no la guarda -->
+  <input type="hidden" id="historial" name="historial" value="[]">
+  <input type="text" name="mensaje" maxlength="1000" required autocomplete="off"
+         placeholder="Por ejemplo: ¿qué calidad tendría un vino con 13 % de alcohol y pH 3,3?"
+         aria-label="Su consulta">
+  <button id="enviar" type="submit">Enviar</button>
+</form>
+
+<div class="ejemplos sugerencias">
+  <span>Para empezar:</span>
+  {% for sugerencia in [
+    "¿Qué calidad tendría un vino con 13 % de alcohol y acidez volátil 0,3?",
+    "¿Qué pasa con ese vino si le cambio el alcohol?",
+    "¿Qué tan confiable es el modelo?",
+  ] %}
+  <!-- Al presionar, el texto se copia a la casilla y se envía el formulario -->
+  <button type="button" class="secondary outline"
+          onclick="const f = document.querySelector('form.conversar');
+                   f.mensaje.value = this.textContent; f.requestSubmit()">{{ sugerencia }}</button>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

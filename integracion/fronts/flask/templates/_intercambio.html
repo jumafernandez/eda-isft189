@@ -1,0 +1,25 @@
+{# Trozo de HTML que devuelve /conversar: la consulta, la respuesta y las
+   herramientas que usó el modelo de lenguaje para responder #}
+<div class="burbuja persona">{{ mensaje }}</div>
+
+{% if falla %}
+<div class="burbuja asistente error" role="alert">{{ falla }}</div>
+{% else %}
+<div class="burbuja asistente">{{ respuesta }}</div>
+{% for herramienta in usadas %}
+<p class="consulta">Consultó el modelo de vinos:
+  <code>{{ herramienta.nombre }}</code>
+  {% for nombre, valor in herramienta.datos.get("mediciones", {}).items() %}
+  <span>{{ nombre }} = {{ valor }}</span>
+  {% endfor %}
+  {% if herramienta.datos.get("variable") %}
+  <span>moviendo {{ herramienta.datos.variable }}</span>
+  {% endif %}
+</p>
+{% endfor %}
+{% endif %}
+
+{# hx-swap-oob: además de agregar lo de arriba, HTMX reemplaza el campo oculto
+   que tiene este mismo id, para que el próximo mensaje lleve la conversación #}
+<input type="hidden" id="historial" name="historial" value="{{ historial }}"
+       hx-swap-oob="true">

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block titulo %}Evaluar un vino{% endblock %}
+
+{% block contenido %}
+<p class="volanta">Laboratorio</p>
+<h1>¿Qué calidad tiene este vino?</h1>
+<p class="bajada">Cargue las once mediciones de laboratorio o parta de un vino
+  de ejemplo. El modelo estima cómo lo calificaría un panel de catadores.</p>
+
+<div class="dos-columnas">
+  <!-- hx-post: al enviar, HTMX manda el formulario a /predecir sin recargar la
+       página. hx-target: la respuesta (un trozo de HTML) reemplaza el
+       contenido del recuadro #resultado. -->
+  <form hx-post="{{ url_for('predecir') }}" hx-target="#resultado"
+        hx-indicator="#evaluar" novalidate>
+    <div class="ejemplos">
+      <span>Ejemplos:</span>
+      {% for ejemplo in info.ejemplos %}
+      <!-- Cada botón pide al servidor los campos ya completos -->
+      <button type="button" class="secondary outline"
+              hx-get="{{ url_for('ejemplo', numero=loop.index0) }}"
+              hx-target="#campos">{{ ejemplo.nombre }}</button>
+      {% endfor %}
+    </div>
+
+    <div id="campos">
+      {% include "_campos.html" %}
+    </div>
+
+    <button id="evaluar" type="submit">Evaluar vino</button>
+  </form>
+
+  <aside id="resultado" aria-live="polite">
+    <article class="resultado vacio">
+      <p>El resultado aparece acá cuando presione <strong>Evaluar vino</strong>.</p>
+    </article>
+  </aside>
+</div>
+{% endblock %}

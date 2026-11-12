@@ -7,3 +7,14 @@ __pycache__/
 /.quarto/
 **/*.quarto_ipynb
 modelo_info.json
+
+# Integración: secretos, entornos y dependencias
+.env
+.env.local
+.venv/
+.pytest_cache/
+node_modules/
+.next/
+
+# Planillas que genera el script de automatización
+integracion/automatizacion/salida/

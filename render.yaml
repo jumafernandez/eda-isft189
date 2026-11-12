@@ -1,0 +1,37 @@
+# Blueprint de Render para el ejemplo de integracion/.
+# Con "New > Blueprint", Render lee este archivo y crea los dos servicios.
+# Detalle en integracion/docs/despliegue.md
+services:
+  - type: web
+    name: api-vinos
+    runtime: docker
+    plan: free
+    dockerfilePath: ./integracion/api/Dockerfile
+    dockerContext: ./integracion
+    healthCheckPath: /v1/health
+    envVars:
+      - key: API_KEY
+        generateValue: true        # Render inventa una clave al crear el servicio
+      - key: API_KEY_PUBLICA
+        generateValue: true
+      - key: ORIGENES_PERMITIDOS
+        sync: false                # Render pregunta el valor al crear el servicio
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+
+  - type: web
+    name: catador-flask
+    runtime: docker
+    plan: free
+    dockerfilePath: ./integracion/fronts/flask/Dockerfile
+    dockerContext: ./integracion/fronts/flask
+    envVars:
+      - key: API_URL
+        sync: false                # la dirección pública de api-vinos
+      - key: API_KEY
+        fromService:               # la misma clave privada que usa la API
+          type: web
+          name: api-vinos
+          envVarKey: API_KEY
+      - key: ANTHROPIC_API_KEY
+        sync: false                # opcional: activa la pantalla Conversar

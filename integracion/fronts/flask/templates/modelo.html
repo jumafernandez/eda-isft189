@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block titulo %}El modelo{% endblock %}
+
+{% block contenido %}
+<p class="volanta">Ficha técnica</p>
+<h1>{{ info.nombre }}</h1>
+<p class="bajada">Lo que la API informa sobre el modelo que está sirviendo.</p>
+
+<div class="tarjetas">
+  <article>
+    <p class="rotulo">Estado del servicio</p>
+    <p class="dato"><span class="punto"></span> Activo</p>
+    <small>Respondió en {{ demora }} ms</small>
+  </article>
+  <article>
+    <p class="rotulo">Versión</p>
+    <p class="dato">{{ info.version }}</p>
+    <small>Entrenado el {{ info.fecha_entrenamiento }}</small>
+  </article>
+  <article>
+    <p class="rotulo">Accuracy</p>
+    <p class="dato">{{ ((info.accuracy_prueba * 100) | round(1) | string) | replace(".", ",") }} %</p>
+    <small>Sobre {{ info.filas_prueba }} vinos de prueba</small>
+  </article>
+  <article>
+    <p class="rotulo">F1 macro</p>
+    <p class="dato">{{ (info.f1_macro_prueba | string) | replace(".", ",") }}</p>
+    <small>Promedio parejo entre las tres clases</small>
+  </article>
+</div>
+
+<div class="dos-columnas parejas">
+  <section>
+    <h2>Matriz de confusión</h2>
+    <p>Cada fila es la calidad real y cada columna, la que predijo el modelo.
+      La diagonal reúne los aciertos.</p>
+    <table class="matriz">
+      <thead>
+        <tr>
+          <th>Real \ Predicha</th>
+          {% for clase in info.clases %}<th>{{ clase }}</th>{% endfor %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for fila in info.matriz_confusion %}
+        {% set real = loop.index0 %}
+        <tr>
+          <th>{{ info.clases[real] }}</th>
+          {% for cantidad in fila %}
+          <td {% if loop.index0 == real %}class="acierto"{% endif %}>{{ cantidad }}</td>
+          {% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </section>
+
+  <section>
+    <h2>Origen</h2>
+    <table>
+      <tbody>
+        <tr><th>Dataset</th><td>{{ info.dataset }}</td></tr>
+        <tr><th>Vinos de entrenamiento</th><td>{{ info.filas_entrenamiento }}</td></tr>
+        <tr><th>scikit-learn</th><td>{{ info.scikit_learn }}</td></tr>
+        <tr><th>API</th><td><code>{{ api_url }}</code></td></tr>
+      </tbody>
+    </table>
+  </section>
+</div>
+
+<h2>Variables de entrada</h2>
+<div class="overflow-auto">
+  <table class="striped">
+    <thead>
+      <tr><th>Variable</th><th>Grupo</th><th>Unidad</th>
+        <th>Mínimo</th><th>Mediana</th><th>Máximo</th></tr>
+    </thead>
+    <tbody>
+      {% for variable in info.variables %}
+      <tr>
+        <td>{{ variable.etiqueta }}</td>
+        <td>{{ variable.grupo }}</td>
+        <td>{{ variable.unidad or "-" }}</td>
+        <td>{{ variable.minimo }}</td>
+        <td>{{ variable.mediana }}</td>
+        <td>{{ variable.maximo }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

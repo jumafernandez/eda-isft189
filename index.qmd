@@ -16,3 +16,5 @@ Material de la cursada.
 - [Código de ejemplo: modelo-api](https://github.com/jumafernandez/eda-isft189/tree/main/modelo-api): entrenamiento, API con FastAPI y cliente HTML.
 - [Guía práctica: Dockerfile](guia-dockerfile.qmd). Del modelo entrenado a la API en un contenedor. También disponible en [PDF](guia-dockerfile.pdf).
 - [Código de ejemplo](https://github.com/jumafernandez/eda-isft189/tree/main/proyecto): API con FastAPI, interfaz con Flask y Docker Compose.
+- [Guía práctica: integración del modelo y front-end](guia-integracion.qmd). Una API con clave y CORS, siete formas de aprovechar el modelo, sus pruebas y su despliegue. También disponible en [PDF](guia-integracion.pdf).
+- [Código de ejemplo: integracion](https://github.com/jumafernandez/eda-isft189/tree/main/integracion): modelo, API, widget, aplicaciones Flask y Next.js, script de automatización, pruebas y documentos de despliegue.

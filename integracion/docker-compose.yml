@@ -1,0 +1,54 @@
+# Levanta la API y los tres fronts con un solo comando:
+#   docker compose up --build
+#
+# Las claves se leen del archivo .env de esta carpeta (copie .env.example).
+services:
+  api:
+    build:
+      context: .                  # necesita las carpetas modelo/ y api/
+      dockerfile: api/Dockerfile
+    env_file: .env
+    ports:
+      - "8000:8000"
+    # Compose consulta esta ruta para saber cuándo la API está lista
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/v1/health')"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Página estática de prueba del widget. El navegador llama a la API
+  # directamente, por eso usa http://localhost:8000 y la clave pública.
+  widget:
+    image: nginx:stable-alpine
+    volumes:
+      - ./fronts/widget:/usr/share/nginx/html:ro
+    ports:
+      - "8080:80"
+
+  # Flask llama a la API desde el servidor, dentro de la red de Compose:
+  # la encuentra por el nombre del servicio (api), no por localhost.
+  flask:
+    build: ./fronts/flask
+    environment:
+      - API_URL=http://api:8000
+      - API_KEY=${API_KEY}
+      # Opcional: activa la pantalla Conversar. Sin clave, queda desactivada
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+    ports:
+      - "8001:8001"
+    depends_on:
+      api:
+        condition: service_healthy
+
+  nextjs:
+    build: ./fronts/nextjs
+    environment:
+      - API_URL=http://api:8000
+      - API_KEY=${API_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy

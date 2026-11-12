@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Catador virtual{% endblock %} - Bodega Los Aromos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+  <!-- Pico.css: una hoja de estilos que deja prolijo el HTML sin escribir clases -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2.1.1/css/pico.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilos.css') }}">
+  <!-- HTMX: permite que un formulario actualice solo una parte de la página -->
+  <script src="https://unpkg.com/htmx.org@2.0.4/dist/htmx.min.js" defer></script>
+</head>
+<body>
+  <header class="cabecera">
+    <div class="container">
+      <a class="marca" href="{{ url_for('inicio') }}">
+        <strong>Bodega Los Aromos</strong>
+        <span>Catador virtual</span>
+      </a>
+      <nav>
+        <a href="{{ url_for('inicio') }}"
+           {% if request.endpoint == 'inicio' %}aria-current="page"{% endif %}>Un vino</a>
+        <a href="{{ url_for('lote') }}"
+           {% if request.endpoint == 'lote' %}aria-current="page"{% endif %}>Un lote</a>
+        <a href="{{ url_for('conversar') }}"
+           {% if request.endpoint == 'conversar' %}aria-current="page"{% endif %}>Conversar</a>
+        <a href="{{ url_for('modelo') }}"
+           {% if request.endpoint == 'modelo' %}aria-current="page"{% endif %}>El modelo</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    {% block contenido %}{% endblock %}
+  </main>
+
+  <footer class="container pie">
+    Front con Flask y HTMX - Práctica Profesional, ISFT N°189
+  </footer>
+</body>
+</html>

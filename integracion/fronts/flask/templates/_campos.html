@@ -1,0 +1,18 @@
+{# Los campos del formulario, agrupados. Se usa al abrir la página
+   y cada vez que se elige un vino de ejemplo. #}
+{% for grupo, variables in grupos.items() %}
+<fieldset>
+  <legend>{{ grupo }}</legend>
+  <div class="campos">
+    {% for variable in variables %}
+    <label>
+      {{ variable.etiqueta }}
+      {% if variable.unidad %}<small>{{ variable.unidad }}</small>{% endif %}
+      <input type="number" step="any" name="{{ variable.nombre }}"
+             value="{{ valores[variable.nombre] }}"
+             title="Valores habituales: {{ variable.minimo }} a {{ variable.maximo }}">
+    </label>
+    {% endfor %}
+  </div>
+</fieldset>
+{% endfor %}

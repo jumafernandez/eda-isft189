@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block titulo %}Evaluar un lote{% endblock %}
+
+{% block contenido %}
+<p class="volanta">Laboratorio</p>
+<h1>Evaluar un lote de vinos</h1>
+<p class="bajada">Suba un archivo CSV con una fila por vino y descargue el mismo
+  archivo con la calidad estimada de cada uno.</p>
+
+<!-- hx-encoding: necesario para que el formulario envíe un archivo -->
+<form hx-post="{{ url_for('predecir_lote') }}" hx-target="#resultado-lote"
+      hx-encoding="multipart/form-data" hx-indicator="#enviar">
+  <label>
+    Archivo CSV
+    <input type="file" name="archivo" accept=".csv,text/csv" required>
+    <small>Debe tener las once columnas de mediciones. Admite coma o punto y
+      coma como separador. Si no tiene uno a mano,
+      <a href="{{ url_for('csv_de_ejemplo') }}">descargue un CSV de ejemplo</a>.</small>
+  </label>
+  <button id="enviar" type="submit">Evaluar lote</button>
+</form>
+
+<div id="resultado-lote" aria-live="polite"></div>
+{% endblock %}

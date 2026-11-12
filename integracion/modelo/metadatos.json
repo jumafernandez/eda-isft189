@@ -1,0 +1,184 @@
+{
+  "nombre": "Clasificador de calidad de vinos",
+  "version": "1.0.0",
+  "fecha_entrenamiento": "2026-11-12",
+  "dataset": "Wine Quality (UCI Machine Learning Repository, id 186)",
+  "scikit_learn": "1.9.1",
+  "clases": [
+    "baja",
+    "media",
+    "alta"
+  ],
+  "variables": [
+    {
+      "nombre": "acidez_fija",
+      "etiqueta": "Acidez fija",
+      "unidad": "g/L",
+      "grupo": "Acidez",
+      "minimo": 3.8,
+      "maximo": 15.9,
+      "mediana": 7.0
+    },
+    {
+      "nombre": "acidez_volatil",
+      "etiqueta": "Acidez volátil",
+      "unidad": "g/L",
+      "grupo": "Acidez",
+      "minimo": 0.08,
+      "maximo": 1.58,
+      "mediana": 0.29
+    },
+    {
+      "nombre": "acido_citrico",
+      "etiqueta": "Ácido cítrico",
+      "unidad": "g/L",
+      "grupo": "Acidez",
+      "minimo": 0.0,
+      "maximo": 1.66,
+      "mediana": 0.31
+    },
+    {
+      "nombre": "ph",
+      "etiqueta": "pH",
+      "unidad": "",
+      "grupo": "Acidez",
+      "minimo": 2.72,
+      "maximo": 4.01,
+      "mediana": 3.21
+    },
+    {
+      "nombre": "dioxido_azufre_libre",
+      "etiqueta": "Dióxido de azufre libre",
+      "unidad": "mg/L",
+      "grupo": "Conservación",
+      "minimo": 1.0,
+      "maximo": 289.0,
+      "mediana": 29.0
+    },
+    {
+      "nombre": "dioxido_azufre_total",
+      "etiqueta": "Dióxido de azufre total",
+      "unidad": "mg/L",
+      "grupo": "Conservación",
+      "minimo": 6.0,
+      "maximo": 440.0,
+      "mediana": 118.0
+    },
+    {
+      "nombre": "sulfatos",
+      "etiqueta": "Sulfatos",
+      "unidad": "g/L",
+      "grupo": "Conservación",
+      "minimo": 0.22,
+      "maximo": 2.0,
+      "mediana": 0.51
+    },
+    {
+      "nombre": "cloruros",
+      "etiqueta": "Cloruros",
+      "unidad": "g/L",
+      "grupo": "Conservación",
+      "minimo": 0.009,
+      "maximo": 0.611,
+      "mediana": 0.047
+    },
+    {
+      "nombre": "azucar_residual",
+      "etiqueta": "Azúcar residual",
+      "unidad": "g/L",
+      "grupo": "Cuerpo",
+      "minimo": 0.6,
+      "maximo": 65.8,
+      "mediana": 3.0
+    },
+    {
+      "nombre": "densidad",
+      "etiqueta": "Densidad",
+      "unidad": "g/mL",
+      "grupo": "Cuerpo",
+      "minimo": 0.98711,
+      "maximo": 1.03898,
+      "mediana": 0.99489
+    },
+    {
+      "nombre": "alcohol",
+      "etiqueta": "Alcohol",
+      "unidad": "% vol.",
+      "grupo": "Cuerpo",
+      "minimo": 8.0,
+      "maximo": 14.9,
+      "mediana": 10.3
+    }
+  ],
+  "filas_entrenamiento": 5197,
+  "filas_prueba": 1300,
+  "accuracy_prueba": 0.835,
+  "f1_macro_prueba": 0.643,
+  "matriz_confusion": [
+    [
+      12,
+      36,
+      1
+    ],
+    [
+      10,
+      877,
+      108
+    ],
+    [
+      0,
+      60,
+      196
+    ]
+  ],
+  "ejemplos": [
+    {
+      "nombre": "Calidad baja",
+      "valores": {
+        "acidez_fija": 10.0,
+        "acidez_volatil": 0.91,
+        "acido_citrico": 0.42,
+        "ph": 3.11,
+        "dioxido_azufre_libre": 34.0,
+        "dioxido_azufre_total": 181.0,
+        "sulfatos": 0.46,
+        "cloruros": 0.056,
+        "azucar_residual": 1.6,
+        "densidad": 0.9968,
+        "alcohol": 10.0
+      }
+    },
+    {
+      "nombre": "Calidad media",
+      "valores": {
+        "acidez_fija": 6.5,
+        "acidez_volatil": 0.24,
+        "acido_citrico": 0.19,
+        "ph": 2.99,
+        "dioxido_azufre_libre": 30.0,
+        "dioxido_azufre_total": 111.0,
+        "sulfatos": 0.46,
+        "cloruros": 0.041,
+        "azucar_residual": 1.2,
+        "densidad": 0.99254,
+        "alcohol": 9.4
+      }
+    },
+    {
+      "nombre": "Calidad alta",
+      "valores": {
+        "acidez_fija": 5.8,
+        "acidez_volatil": 0.32,
+        "acido_citrico": 0.2,
+        "ph": 3.36,
+        "dioxido_azufre_libre": 17.0,
+        "dioxido_azufre_total": 123.0,
+        "sulfatos": 0.78,
+        "cloruros": 0.027,
+        "azucar_residual": 2.6,
+        "densidad": 0.98936,
+        "alcohol": 13.9
+      }
+    }
+  ]
+}

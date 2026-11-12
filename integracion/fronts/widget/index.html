@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bodega Los Aromos - página de prueba del widget</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    /* Esta página simula el sitio de un tercero (una bodega ficticia)
+       que decide sumar el widget. Sus estilos no afectan al widget. */
+    body {
+      margin: 0; background: #faf5ec; color: #2b2024;
+      font-family: "Inter", system-ui, sans-serif; line-height: 1.6;
+    }
+    header {
+      background: #4a1420; color: #f3e6d0; padding: 18px 32px;
+      display: flex; justify-content: space-between; align-items: baseline;
+    }
+    header strong {
+      font-family: "Playfair Display", Georgia, serif; font-size: 22px;
+      font-weight: 600; letter-spacing: .02em;
+    }
+    header span { font-size: 13px; color: #d8bf8f; }
+    main {
+      max-width: 1040px; margin: 0 auto; padding: 48px 32px;
+      display: grid; grid-template-columns: 1fr 420px; gap: 56px;
+      align-items: start;
+    }
+    h1 {
+      font-family: "Playfair Display", Georgia, serif; font-size: 44px;
+      line-height: 1.15; color: #6b1f2e; margin: 0 0 18px; font-weight: 600;
+    }
+    .volanta {
+      font-size: 12px; letter-spacing: .16em; text-transform: uppercase;
+      color: #b8893b; font-weight: 600; margin: 0 0 10px;
+    }
+    p { margin: 0 0 16px; max-width: 54ch; }
+    .codigo {
+      margin-top: 28px; background: #2b2024; color: #f3e6d0;
+      border-radius: 12px; padding: 16px 18px; font-size: 12.5px;
+      font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+      overflow-x: auto; white-space: pre;
+    }
+    .nota { font-size: 13px; color: #7a6a63; margin-top: 10px; }
+    @media (max-width: 900px) {
+      main { grid-template-columns: 1fr; gap: 32px; padding: 32px 20px; }
+      h1 { font-size: 34px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <strong>Bodega Los Aromos</strong>
+    <span>Luján, Buenos Aires</span>
+  </header>
+
+  <main>
+    <section>
+      <p class="volanta">Laboratorio abierto</p>
+      <h1>Del análisis de laboratorio a la copa</h1>
+      <p>En Los Aromos medimos cada partida antes de embotellar: acidez,
+        azúcar, sulfatos, alcohol. Con esas once mediciones, un modelo
+        entrenado con miles de vinos estima cómo lo calificaría un panel
+        de catadores.</p>
+      <p>Pruébelo con el catador virtual: elija un vino de ejemplo o cargue
+        sus propias mediciones.</p>
+
+      <div class="codigo">&lt;script src="widget.js"
+        data-api="http://localhost:8000"
+        data-clave="cambie-esta-clave-publica"&gt;&lt;/script&gt;</div>
+      <p class="nota">Esa línea es todo lo que esta página necesita para
+        mostrar el widget de la derecha.</p>
+    </section>
+
+    <aside>
+      <!-- El widget aparece en el lugar donde se escribe esta línea.
+           data-clave lleva la clave pública: cualquiera que abra el código
+           de la página puede leerla, por eso la API le da permisos mínimos. -->
+      <script src="widget.js"
+        data-api="http://localhost:8000"
+        data-clave="cambie-esta-clave-publica"></script>
+    </aside>
+  </main>
+</body>
+</html>

@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block titulo %}Servicio no disponible{% endblock %}
+
+{% block contenido %}
+<p class="volanta">Servicio no disponible</p>
+<h1>No pudimos consultar el modelo</h1>
+{% include "_error.html" %}
+<p>La página funciona, pero el servicio que hace las predicciones no respondió.
+  Vuelva a intentar en unos minutos.</p>
+{% endblock %}

@@ -1,0 +1,76 @@
+name: Pruebas de integración
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "integracion/**"
+      - ".github/workflows/pruebas-integracion.yml"
+  pull_request:
+    paths:
+      - "integracion/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integracion
+    # Valores de prueba: solo existen dentro de esta corrida, no son secretos
+    env:
+      API_KEY: clave-privada-de-prueba
+      API_KEY_PUBLICA: clave-publica-de-prueba
+      ORIGENES_PERMITIDOS: http://localhost:8080
+      BASE_URL: http://localhost:8000
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar librerías
+        run: pip install -r api/requirements.txt -r tests/requirements.txt
+
+      - name: Entrenar el modelo
+        run: python modelo/entrenar.py
+
+      - name: Levantar la API
+        working-directory: integracion/api
+        run: |
+          uvicorn app.main:app --port 8000 &
+          # Espera hasta que la API responda (30 segundos como máximo)
+          for intento in $(seq 1 30); do
+            if curl -sf http://localhost:8000/v1/health; then exit 0; fi
+            sleep 1
+          done
+          echo "La API no respondió" && exit 1
+
+      - name: Correr las pruebas
+        run: pytest tests -v -s
+
+      - name: Probar el límite de pedidos
+        run: PROBAR_LIMITE=1 pytest tests/test_limite.py -v
+
+  # El front Next.js se compila aparte: la compilación incluye la revisión de tipos
+  front-nextjs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: integracion/fronts/nextjs
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar
+        run: npm run build

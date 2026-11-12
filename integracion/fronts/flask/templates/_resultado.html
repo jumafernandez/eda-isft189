@@ -1,0 +1,18 @@
+{# Trozo de HTML que devuelve /predecir: solo el recuadro del resultado #}
+<article class="resultado">
+  <p class="rotulo">Calidad estimada</p>
+  <p class="calidad {{ prediccion.calidad }}">{{ prediccion.calidad }}</p>
+
+  {% for clase, probabilidad in prediccion.probabilidades.items() %}
+  <div class="fila">
+    <span>{{ clase }}</span>
+    <div class="barra">
+      <div class="relleno {{ clase }}" style="width: {{ (probabilidad * 100) | round | int }}%"></div>
+    </div>
+    <span>{{ (probabilidad * 100) | round | int }} %</span>
+  </div>
+  {% endfor %}
+
+  <p class="nota">Estimación de un modelo estadístico, versión
+    {{ prediccion.version_modelo }}. No reemplaza una cata.</p>
+</article>

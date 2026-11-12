@@ -1,0 +1,109 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+/* Tailwind toma sus colores y tipografías de estas variables */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-heading: var(--font-playfair);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --color-cabecera: var(--cabecera);
+  --color-dorado: var(--dorado);
+  --color-baja: var(--baja);
+  --color-media: var(--media);
+  --color-alta: var(--alta);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+}
+
+/* Identidad de la bodega: bordó, crema y dorado */
+:root {
+  --background: #faf5ec;
+  --foreground: #2b2024;
+  --card: #fffdf8;
+  --card-foreground: #2b2024;
+  --popover: #fffdf8;
+  --popover-foreground: #2b2024;
+  --primary: #6b1f2e;
+  --primary-foreground: #ffffff;
+  --secondary: #f1e7d6;
+  --secondary-foreground: #4a1420;
+  --muted: #f1e7d6;
+  --muted-foreground: #7a6a63;
+  --accent: #f1e7d6;
+  --accent-foreground: #4a1420;
+  --destructive: #b3402a;
+  --border: #e6dccb;
+  --input: #d9c9b0;
+  --ring: #b8893b;
+  --radius: 0.7rem;
+  --cabecera: #4a1420;
+  --dorado: #b8893b;
+  --baja: #b5523b;
+  --media: #a0762b;
+  --alta: #5d7a3a;
+}
+
+/* Tema oscuro: se activa cuando <html> tiene la clase "dark" */
+.dark {
+  --background: #1a1114;
+  --foreground: #f3e6d0;
+  --card: #241a1d;
+  --card-foreground: #f3e6d0;
+  --popover: #241a1d;
+  --popover-foreground: #f3e6d0;
+  --primary: #d1a85a;
+  --primary-foreground: #2a1a12;
+  --secondary: #33252a;
+  --secondary-foreground: #f3e6d0;
+  --muted: #2e2125;
+  --muted-foreground: #b9a79b;
+  --accent: #33252a;
+  --accent-foreground: #f3e6d0;
+  --destructive: #e58a73;
+  --border: rgb(255 255 255 / 10%);
+  --input: rgb(255 255 255 / 16%);
+  --ring: #d1a85a;
+  --cabecera: #120b0d;
+  --dorado: #d1a85a;
+  --baja: #e08a70;
+  --media: #dcb565;
+  --alta: #9cbd72;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  button:not(:disabled), [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+  html {
+    @apply font-sans;
+  }
+}

@@ -5,6 +5,7 @@ project:
     - index.qmd
     - guia-dockerfile.qmd
     - guia-fastapi.qmd
+    - guia-integracion.qmd
 
 website:
   title: "Práctica Profesional: Análisis y Exploración de Datos"
@@ -16,8 +17,10 @@ website:
         text: "Guía práctica: FastAPI"
       - href: guia-dockerfile.qmd
         text: "Guía práctica: Dockerfile"
+      - href: guia-integracion.qmd
+        text: "Guía práctica: Integración"
   page-footer:
-    center: "LICDIA · Instituto Superior de Formación Técnica N°189"
+    center: "LICDIA - Instituto Superior de Formación Técnica N°189"
 
 format:
   html:

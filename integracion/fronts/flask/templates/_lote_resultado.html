@@ -1,0 +1,45 @@
+{# Trozo de HTML que devuelve /lote: resumen, vista previa y descarga #}
+<article class="resultado">
+  <p class="rotulo">Vinos evaluados</p>
+  <p class="calidad">{{ total }}</p>
+
+  <div class="conteo">
+    {% for clase, cantidad in conteo.items() %}
+    <div>
+      <strong class="{{ clase }}">{{ cantidad }}</strong>
+      <span>calidad {{ clase }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <a role="button" download="vinos_evaluados.csv"
+     href="data:text/csv;charset=utf-8;base64,{{ descarga }}">Descargar CSV con resultados</a>
+</article>
+
+<h2>Vista previa</h2>
+<div class="overflow-auto">
+  <table class="striped">
+    <thead>
+      <tr>
+        <th>Fila</th>
+        <th>Calidad</th>
+        <th>Probabilidad</th>
+        {% for nombre in columnas %}<th>{{ nombre }}</th>{% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for vino, prediccion in vista_previa %}
+      <tr>
+        <td>{{ loop.index + 1 }}</td>
+        <td><span class="etiqueta {{ prediccion.calidad }}">{{ prediccion.calidad }}</span></td>
+        <td>{{ (prediccion.probabilidades[prediccion.calidad] * 100) | round | int }} %</td>
+        {% for nombre in columnas %}<td>{{ vino[nombre] }}</td>{% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% if total > vista_previa | length %}
+<p class="nota">Se muestran las primeras {{ vista_previa | length }} filas de
+  {{ total }}. El archivo descargado las incluye todas.</p>
+{% endif %}

@@ -1,0 +1,14 @@
+{# Trozo de HTML para mostrar un error de la API en el lugar del resultado #}
+<article class="resultado error" role="alert">
+  <p><strong>{{ error.mensaje }}</strong></p>
+  {% if error.detalle %}
+  <ul>
+    {% for problema in error.detalle[:10] %}
+    <li><code>{{ problema.campo }}</code>: {{ problema.mensaje }}</li>
+    {% endfor %}
+  </ul>
+  {% if error.detalle | length > 10 %}
+  <p>Y {{ error.detalle | length - 10 }} más.</p>
+  {% endif %}
+  {% endif %}
+</article>
