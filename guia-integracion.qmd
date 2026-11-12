@@ -176,6 +176,8 @@ Además del modelo, `entrenar.py` escribe `metadatos.json`. Este archivo es más
 
 Cada variable lleva su etiqueta, su unidad y el rango observado en los datos. Con esa información, **los formularios se arman solos**: el widget y las dos aplicaciones piden los metadatos a la API y dibujan un campo por variable. Si mañana el modelo cambia de variables, los clientes se adaptan sin tocar su código. Los `ejemplos` son tres vinos reales del conjunto de prueba, uno por clase, que los formularios ofrecen como punto de partida.
 
+Si entrena el modelo en otra computadora o dentro de Docker, las métricas y los vinos de ejemplo pueden diferir levemente de los de este fragmento: es esperable, y por eso los clientes los leen siempre de la API en lugar de tenerlos escritos.
+
 La **matriz de confusión** tiene una fila por clase real y una columna por clase predicha, en el orden de `clases`. La **accuracy** es la proporción de aciertos. El **F1 macro** promedia el desempeño de las tres clases dándoles el mismo peso; es más bajo que la accuracy porque los vinos de calidad baja son pocos y el modelo los reconoce con dificultad.
 
 # La API, un paso más allá
@@ -659,6 +661,8 @@ El ida y vuelta de los cuatro pasos lo maneja la propia librería:
 ```
 
 `system` son las **instrucciones** que recibe el modelo de lenguaje: quién es, que no debe estimar calidades por su cuenta y cómo presentar los resultados. Incluyen la ficha del modelo, tomada de `/v1/model-info`, para que conozca los nombres de las mediciones y pueda responder preguntas sobre la confiabilidad. `messages` lleva la conversación completa, porque el servicio no recuerda los mensajes anteriores: la pantalla los guarda y los reenvía en cada pedido.
+
+![Conversación: la respuesta del modelo de lenguaje y, debajo, la consulta que hizo al modelo de vinos.](img/integracion-flask-conversar.png){width=92% fig-align="center"}
 
 Debajo de cada respuesta, la pantalla muestra qué herramienta se usó y con qué datos. Es una decisión de diseño: los números provienen del modelo de vinos y la redacción, del modelo de lenguaje; mostrar la consulta permite comprobar que la pregunta se interpretó bien.
 
