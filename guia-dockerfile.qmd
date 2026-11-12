@@ -35,7 +35,7 @@ format:
 
 # Introducción
 
-En esta guía se construye, paso a paso, un contenedor Docker que expone un modelo de aprendizaje automático a través de una API. Se parte de un modelo entrenado con Python, se escribe la API con FastAPI, se define el entorno en un **Dockerfile** y, por último, se suma una interfaz web con Streamlit usando **Docker Compose**. Es la misma estructura que pide la entrega 04: un servicio que recibe datos nuevos y devuelve predicciones, y una interfaz que lo consume.
+En esta guía se construye, paso a paso, un contenedor Docker que expone un modelo de aprendizaje automático a través de una API. Se parte de un modelo entrenado con Python, se escribe la API con FastAPI, se define el entorno en un **Dockerfile** y, por último, se suma una interfaz web con Flask usando **Docker Compose**. Es la misma estructura que pide la entrega 04: un servicio que recibe datos nuevos y devuelve predicciones, y una interfaz que lo consume.
 
 El ejemplo usa el dataset Iris porque viene incluido en scikit-learn y no requiere descargas. Al terminar, reemplace el modelo y los datos por los de su proyecto. Antes de empezar, instale Docker siguiendo la *Guía de instalación: Docker*.
 
@@ -52,7 +52,9 @@ proyecto/
 │   ├── Dockerfile         # instrucciones para construir la imagen
 │   └── .dockerignore      # archivos que no se copian a la imagen
 ├── interfaz/
-│   ├── app.py
+│   ├── app.py             # recibe el formulario y consulta a la API
+│   ├── templates/
+│   │   └── index.html     # la página con el formulario
 │   ├── requirements.txt
 │   └── Dockerfile
 └── docker-compose.yml
@@ -65,8 +67,11 @@ La API no entrena: usa un modelo ya entrenado, guardado en un archivo con `jobli
 Archivo `api/entrenar.py`:
 
 ```python
-# Entrena el modelo y lo guarda en modelo.joblib
+# Entrena el modelo y lo guarda en modelo.joblib, con sus metadatos
+import json
+
 import joblib
+import sklearn
 from sklearn.datasets import load_iris
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
@@ -78,28 +83,44 @@ X_train, X_test, y_train, y_test = train_test_split(
 
 modelo = RandomForestClassifier(n_estimators=100, random_state=42)
 modelo.fit(X_train, y_train)
-print(f"Accuracy en prueba: {modelo.score(X_test, y_test):.3f}")
+accuracy = modelo.score(X_test, y_test)
+print(f"Accuracy en prueba: {accuracy:.3f}")
 
 joblib.dump(modelo, "modelo.joblib")
+
+# Metadatos en un JSON legible: es lo que la API devuelve en /modelo
+info = {
+    "nombre": "Clasificador de flores Iris",
+    "version": "1.0",
+    "variables": list(X.columns),
+    "clases": ["setosa", "versicolor", "virginica"],
+    "accuracy_prueba": round(accuracy, 3),
+    "scikit_learn": sklearn.__version__,
+}
+with open("modelo_info.json", "w", encoding="utf-8") as f:
+    json.dump(info, f, ensure_ascii=False, indent=2)
 ```
 
-Si quiere ver el resultado antes de usar Docker, puede ejecutarlo en su computadora con `python entrenar.py`, que imprime la accuracy y crea `modelo.joblib`.
+Además del modelo, el script guarda sus metadatos (nombre, versión, variables, clases, accuracy y versión de scikit-learn) en `modelo_info.json`, un archivo de texto que se puede leer sin Python. Si quiere ver el resultado antes de usar Docker, puede ejecutarlo en su computadora con `python entrenar.py`, que imprime la accuracy y crea los dos archivos.
 
 # La API
 
-La API carga el modelo una sola vez, al iniciar, y ofrece dos rutas: `/`, para comprobar que el servicio está activo, y `/predecir`, que recibe las cuatro medidas de una flor en formato JSON y devuelve la especie. La clase `Flor` define qué datos espera la API; si falta un campo o tiene un tipo incorrecto, FastAPI responde con un error que explica el problema.
+La API carga el modelo y sus metadatos una sola vez, al iniciar, y ofrece tres rutas: `/`, para comprobar que el servicio está activo, `/modelo`, que devuelve los metadatos, y `/predecir`, que recibe las cuatro medidas de una flor en formato JSON y devuelve la especie. La clase `Flor` define qué datos espera la API; si falta un campo o tiene un tipo incorrecto, FastAPI responde con un error que explica el problema.
 
 Archivo `api/api.py`:
 
 ```python
 # API que expone el modelo entrenado
 import joblib
+import json
 import pandas as pd
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 CLASES = ["setosa", "versicolor", "virginica"]
 modelo = joblib.load("modelo.joblib")
+with open("modelo_info.json", encoding="utf-8") as f:
+    info = json.load(f)
 
 app = FastAPI(title="API del modelo Iris")
 
@@ -115,6 +136,9 @@ class Flor(BaseModel):
 def estado():
     return {"estado": "ok"}
 
+@app.get("/modelo")
+def datos_del_modelo():
+    return info
 
 @app.post("/predecir")
 def predecir(flor: Flor):
@@ -172,7 +196,7 @@ Cada instrucción cumple una función:
 | `COPY requirements.txt .` | Copia la lista de librerías desde su computadora a la imagen. |
 | `RUN pip install ...` | Instala las librerías mientras se construye la imagen. |
 | `COPY entrenar.py .` | Copia el script de entrenamiento. |
-| `RUN python entrenar.py` | Entrena el modelo durante la construcción y guarda `modelo.joblib` dentro de la imagen. |
+| `RUN python entrenar.py` | Entrena el modelo durante la construcción y guarda `modelo.joblib` y `modelo_info.json` dentro de la imagen. |
 | `COPY api.py .` | Copia el código de la API. |
 | `EXPOSE 8000` | Documenta el puerto que usa la aplicación. |
 | `CMD [...]` | Indica el comando que se ejecuta al iniciar el contenedor: levantar la API con uvicorn. |
@@ -249,7 +273,7 @@ docker rm api          # eliminarlo
 
 # La interfaz y Docker Compose
 
-La interfaz es una aplicación de Streamlit que muestra un formulario, envía los datos a la API y presenta la respuesta. La dirección de la API se lee de la variable de entorno `API_URL`, para poder cambiarla sin tocar el código.
+La interfaz es una aplicación web hecha con **Flask**, un framework de Python para construir sitios web. Muestra un formulario, envía los datos a la API y presenta la respuesta. La dirección de la API se lee de la variable de entorno `API_URL`, para poder cambiarla sin tocar el código.
 
 Archivo `interfaz/app.py`:
 
@@ -258,34 +282,94 @@ Archivo `interfaz/app.py`:
 import os
 
 import requests
-import streamlit as st
+from flask import Flask, render_template, request
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
-st.title("Clasificador de flores Iris")
+app = Flask(__name__)
 
-largo_sepalo = st.number_input("Largo del sépalo (cm)", value=5.1)
-ancho_sepalo = st.number_input("Ancho del sépalo (cm)", value=3.5)
-largo_petalo = st.number_input("Largo del pétalo (cm)", value=1.4)
-ancho_petalo = st.number_input("Ancho del pétalo (cm)", value=0.2)
 
-if st.button("Predecir"):
+@app.route("/", methods=["GET", "POST"])
+def formulario():
+    # Valores con los que se muestra el formulario la primera vez
     datos = {
-        "largo_sepalo": largo_sepalo,
-        "ancho_sepalo": ancho_sepalo,
-        "largo_petalo": largo_petalo,
-        "ancho_petalo": ancho_petalo,
+        "largo_sepalo": 5.1,
+        "ancho_sepalo": 3.5,
+        "largo_petalo": 1.4,
+        "ancho_petalo": 0.2,
     }
-    respuesta = requests.post(f"{API_URL}/predecir", json=datos, timeout=10)
-    st.success(f"Especie predicha: {respuesta.json()['especie']}")
+    especie = None
+
+    # Al presionar "Predecir", el navegador envía el formulario con POST
+    if request.method == "POST":
+        for nombre in datos:
+            datos[nombre] = float(request.form[nombre])
+        respuesta = requests.post(f"{API_URL}/predecir", json=datos, timeout=10)
+        especie = respuesta.json()["especie"]
+
+    return render_template("index.html", datos=datos, especie=especie)
+```
+
+La función `formulario` atiende dos pedidos distintos a la misma dirección. Cuando el navegador abre la página (`GET`), devuelve el formulario con los valores iniciales. Cuando se presiona **Predecir** (`POST`), lee los valores ingresados, los envía a la API con `requests` y vuelve a armar la página, ahora con la especie predicha. La consulta a la API la hace el servidor de la interfaz, no el navegador.
+
+La página es una **plantilla**: un archivo HTML con marcas entre llaves que Flask reemplaza por valores antes de enviarlo al navegador. Flask busca las plantillas en la carpeta `templates`.
+
+Archivo `interfaz/templates/index.html`:
+
+```html
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Clasificador de flores Iris</title>
+  <style>
+    body { font-family: sans-serif; max-width: 520px; margin: 40px auto; }
+    label { display: block; margin-top: 14px; }
+    input { width: 100%; box-sizing: border-box; padding: 8px; margin-top: 4px; }
+    button { margin-top: 18px; padding: 8px 18px; }
+    .resultado { margin-top: 22px; padding: 14px; border-radius: 6px;
+                 background: #e8f5e9; color: #1b5e20; }
+  </style>
+</head>
+<body>
+  <h1>Clasificador de flores Iris</h1>
+
+  <form method="post">
+    <label>Largo del sépalo (cm)
+      <input type="number" step="0.1" name="largo_sepalo"
+             value="{{ datos.largo_sepalo }}">
+    </label>
+    <label>Ancho del sépalo (cm)
+      <input type="number" step="0.1" name="ancho_sepalo"
+             value="{{ datos.ancho_sepalo }}">
+    </label>
+    <label>Largo del pétalo (cm)
+      <input type="number" step="0.1" name="largo_petalo"
+             value="{{ datos.largo_petalo }}">
+    </label>
+    <label>Ancho del pétalo (cm)
+      <input type="number" step="0.1" name="ancho_petalo"
+             value="{{ datos.ancho_petalo }}">
+    </label>
+    <button type="submit">Predecir</button>
+  </form>
+
+  {% if especie %}
+  <p class="resultado">Especie predicha: {{ especie }}</p>
+  {% endif %}
+</body>
+</html>
 ```
 
 Archivo `interfaz/requirements.txt`:
 
 ```text
-streamlit==1.65.0
+flask==3.1.3
+gunicorn==26.2.0
 requests==2.34.2
 ```
+
+Flask, igual que FastAPI, define qué responder pero no es un servidor. El programa que queda atendiendo los pedidos es `gunicorn`, que cumple en la interfaz el mismo papel que `uvicorn` en la API.
 
 Archivo `interfaz/Dockerfile`:
 
@@ -298,10 +382,11 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app.py .
+COPY templates/ templates/
 
-EXPOSE 8501
+EXPOSE 8080
 
-CMD ["streamlit", "run", "app.py", "--server.address=0.0.0.0", "--server.port=8501"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app"]
 ```
 
 Para no levantar cada contenedor a mano, Docker Compose los define en un único archivo, ubicado en la carpeta raíz del proyecto:
@@ -318,7 +403,7 @@ services:
   interfaz:
     build: ./interfaz
     ports:
-      - "8501:8501"
+      - "8080:8080"
     environment:
       - API_URL=http://api:8000
     depends_on:
@@ -331,9 +416,9 @@ Dentro de la red que crea Compose, cada servicio se encuentra por su nombre: por
 docker compose up --build
 ```
 
-Abra `http://localhost:8501` en el navegador, complete las medidas y presione **Predecir**.
+Abra `http://localhost:8080` en el navegador, complete las medidas y presione **Predecir**.
 
-![Interfaz de Streamlit consumiendo la API del modelo.](img/interfaz.jpg){width=75% fig-align="center"}
+![Interfaz web consumiendo la API del modelo.](img/interfaz.jpg){width=75% fig-align="center"}
 
 Para detener todo, presione `Ctrl+C` en la terminal o ejecute `docker compose down`.
 
@@ -397,7 +482,7 @@ En su proyecto, si los datos de entrenamiento están en un archivo, cópielo con
 | Advertencias de versión al cargar el modelo | La versión de scikit-learn de `requirements.txt` no coincide con la del entrenamiento. |
 | `denied: requested access to the resource is denied` al hacer `push` | No inició sesión con `docker login` o el nombre de la imagen no empieza con su usuario de Docker Hub. |
 | `exec format error` al ejecutar una imagen descargada | La imagen se construyó para otra arquitectura. Publíquela con `docker buildx` para `linux/amd64` y `linux/arm64`. |
-| La interfaz muestra `Connection refused` | Usa `localhost` en lugar del nombre del servicio (`api`) dentro de Compose. |
+| La interfaz muestra `Internal Server Error` al predecir | No pudo comunicarse con la API; `docker compose logs interfaz` muestra `Connection refused`. Usa `localhost` en lugar del nombre del servicio (`api`) dentro de Compose. |
 
 : {tbl-colwidths="[38,62]"}
 
@@ -420,4 +505,5 @@ Podrá ayudarse con Modelos de Lenguaje, como Gemini y soluciones basadas en GPT
 - Docker Inc. *Docker Compose*. <https://docs.docker.com/compose/>
 - Docker Inc. *Docker Hub: repositories*. <https://docs.docker.com/docker-hub/repos/>
 - FastAPI. *FastAPI in Containers - Docker*. <https://fastapi.tiangolo.com/deployment/docker/>
-- Streamlit. *Deploy Streamlit using Docker*. <https://docs.streamlit.io/deploy/tutorials/docker>
+- Flask. *Flask documentation*. <https://flask.palletsprojects.com/>
+- Gunicorn. *Gunicorn documentation*. <https://docs.gunicorn.org/>

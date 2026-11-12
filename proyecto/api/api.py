@@ -7,7 +7,8 @@ from pydantic import BaseModel
 
 CLASES = ["setosa", "versicolor", "virginica"]
 modelo = joblib.load("modelo.joblib")
-info = json.load(open("modelo_info.json"))
+with open("modelo_info.json", encoding="utf-8") as f:
+    info = json.load(f)
 
 app = FastAPI(title="API del modelo Iris")
 

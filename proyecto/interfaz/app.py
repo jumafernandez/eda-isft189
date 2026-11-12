@@ -2,23 +2,29 @@
 import os
 
 import requests
-import streamlit as st
+from flask import Flask, render_template, request
 
 API_URL = os.getenv("API_URL", "http://localhost:8000")
 
-st.title("Clasificador de flores Iris")
+app = Flask(__name__)
 
-largo_sepalo = st.number_input("Largo del sépalo (cm)", value=5.1)
-ancho_sepalo = st.number_input("Ancho del sépalo (cm)", value=3.5)
-largo_petalo = st.number_input("Largo del pétalo (cm)", value=1.4)
-ancho_petalo = st.number_input("Ancho del pétalo (cm)", value=0.2)
 
-if st.button("Predecir"):
+@app.route("/", methods=["GET", "POST"])
+def formulario():
+    # Valores con los que se muestra el formulario la primera vez
     datos = {
-        "largo_sepalo": largo_sepalo,
-        "ancho_sepalo": ancho_sepalo,
-        "largo_petalo": largo_petalo,
-        "ancho_petalo": ancho_petalo,
+        "largo_sepalo": 5.1,
+        "ancho_sepalo": 3.5,
+        "largo_petalo": 1.4,
+        "ancho_petalo": 0.2,
     }
-    respuesta = requests.post(f"{API_URL}/predecir", json=datos, timeout=10)
-    st.success(f"Especie predicha: {respuesta.json()['especie']}")
+    especie = None
+
+    # Al presionar "Predecir", el navegador envía el formulario con POST
+    if request.method == "POST":
+        for nombre in datos:
+            datos[nombre] = float(request.form[nombre])
+        respuesta = requests.post(f"{API_URL}/predecir", json=datos, timeout=10)
+        especie = respuesta.json()["especie"]
+
+    return render_template("index.html", datos=datos, especie=especie)
